@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BIEMMEAPP</title>
+  <meta name="theme-color" content="#002e52" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="BIEMMEAPP" />
+  <link rel="icon" href="logo.jpg" />
+  <link rel="apple-touch-icon" href="logo.jpg" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --biemme-dark: #002e52;
+      --biemme-light: #f4f7fb;
+      --biemme-text: #16324a;
+      --biemme-muted: #6d7b88;
+      --success: #179b4d;
+      --danger: #c0392b;
+      --warning: #d97706;
+      --border: #dbe4ec;
+      --shadow: 0 10px 30px rgba(0, 46, 82, 0.14);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, sans-serif; background: var(--biemme-dark); color: var(--biemme-text); }
+    .page { min-height: 100vh; padding: 18px; }
+    .app-shell { max-width: 1180px; margin: 0 auto; }
+    .topbar { color: white; margin-bottom: 18px; }
+    .brand { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+    .brand img { width: 72px; height: 72px; object-fit: contain; border-radius: 18px; }
+    .brand-text { line-height: 1.05; }
+    .brand-text .title { font-size: 30px; font-weight: 700; letter-spacing: 1px; }
+    .brand-text .subtitle { font-size: 14px; color: #78d7ff; letter-spacing: 2px; }
+    .user-pill { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); border-radius: 18px; padding: 14px 16px; color: white; font-size: 14px; }
+    .card { background: var(--biemme-light); border-radius: 28px; padding: 20px; box-shadow: var(--shadow); margin-bottom: 16px; }
+    .hidden { display: none !important; }
+    .login-title { margin: 0 0 18px 0; color: var(--biemme-dark); font-size: 26px; text-align: center; }
+    .login-subtitle { text-align: center; color: var(--biemme-muted); margin-bottom: 18px; font-size: 14px; }
+    input, button, select, textarea { width: 100%; border-radius: 16px; padding: 14px 16px; font-size: 16px; }
+    input, select, textarea { border: 1px solid var(--border); margin-bottom: 12px; background: white; font-family: inherit; }
+    button { border: none; cursor: pointer; font-weight: 700; transition: transform 0.08s ease, opacity 0.2s ease; }
+    button:active { transform: scale(0.99); }
+    .btn-primary { background: var(--biemme-dark); color: white; margin-bottom: 10px; }
+    .btn-secondary { background: white; color: var(--biemme-dark); border: 1px solid var(--border); }
+    .btn-logout { background: transparent; color: white; border: 1px solid rgba(255,255,255,0.4); border-radius: 20px; padding: 16px; font-size: 18px; font-weight: 700; }
+    .date-box { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+    .date-icon { width: 52px; height: 52px; border-radius: 16px; background: var(--biemme-dark); color: white; display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
+    .date-box h2 { margin: 0; font-size: 28px; color: var(--biemme-dark); }
+    .date-box p { margin: 4px 0 0 0; color: var(--biemme-muted); font-size: 15px; }
+    .action-button { background: var(--biemme-dark); color: white; border-radius: 24px; padding: 22px 20px; margin-bottom: 14px; text-align: left; display: flex; align-items: center; gap: 18px; }
+    .action-icon { width: 64px; min-width: 64px; height: 64px; border-radius: 18px; background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 34px; }
+    .action-text .big { display: block; font-size: 22px; font-weight: 800; letter-spacing: 0.5px; }
+    .action-text .small { display: block; font-size: 15px; color: #7dd8ff; margin-top: 3px; font-weight: 400; }
+    .status-card, .summary-card, .history-card { background: white; border: 1px solid var(--border); border-radius: 22px; padding: 16px; margin-top: 14px; }
+    .status-title, .summary-title, .history-title { font-size: 22px; font-weight: 700; color: var(--biemme-dark); margin-bottom: 16px; }
+    .status-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid #edf2f7; }
+    .status-row:last-of-type { border-bottom: none; }
+    .status-left { display: flex; align-items: center; gap: 14px; }
+    .status-icon { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; flex-shrink: 0; }
+    .status-icon.ok { background: rgba(23, 155, 77, 0.12); color: var(--success); }
+    .status-icon.wait { background: rgba(0, 46, 82, 0.08); color: var(--biemme-dark); }
+    .status-label { font-size: 22px; font-weight: 700; color: var(--biemme-dark); margin-bottom: 2px; }
+    .status-sub { font-size: 14px; color: var(--biemme-muted); }
+    .status-time { font-size: 22px; font-weight: 800; white-space: nowrap; }
+    .status-time.ok { color: var(--success); }
+    .status-time.wait { color: #98a4af; }
+    .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .summary-box { border: 1px solid var(--border); border-radius: 18px; padding: 14px; background: #fbfdff; }
+    .summary-box.full { grid-column: 1 / -1; }
+    .summary-label { font-size: 13px; color: var(--biemme-muted); margin-bottom: 8px; }
+    .summary-value { font-size: 24px; font-weight: 800; color: var(--biemme-dark); }
+    .summary-value.positive { color: var(--success); }
+    .summary-value.negative { color: var(--danger); }
+    .month-selector, .admin-actions { margin-bottom: 14px; }
+    .admin-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .admin-actions button { width: auto; min-width: 220px; }
+    .history-list { display: flex; flex-direction: column; gap: 10px; }
+    .history-item { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 16px; background: #fbfdff; }
+    .history-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .history-badge { min-width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; flex-shrink: 0; }
+    .history-badge.entrata { background: rgba(23, 155, 77, 0.12); color: var(--success); }
+    .history-badge.uscita { background: rgba(192, 57, 43, 0.12); color: var(--danger); }
+    .history-main { min-width: 0; }
+    .history-type { font-size: 17px; font-weight: 700; color: var(--biemme-dark); }
+    .history-date { font-size: 13px; color: var(--biemme-muted); margin-top: 2px; }
+    .history-time { font-size: 20px; font-weight: 800; white-space: nowrap; color: var(--biemme-dark); }
+    .empty-history, .detail-empty, .list-box { padding: 14px; border-radius: 16px; background: #f7fafc; color: var(--biemme-muted); text-align: center; border: 1px dashed var(--border); }
+    .msg { margin-top: 14px; padding: 14px 16px; border-radius: 16px; font-size: 14px; display: none; }
+    .admin-table-wrap, .detail-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 18px; background: white; }
+    table { width: 100%; border-collapse: collapse; min-width: 820px; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid #edf2f7; text-align: left; font-size: 14px; vertical-align: middle; }
+    th { background: #f8fbff; color: var(--biemme-dark); font-weight: 700; position: sticky; top: 0; }
+    tr:last-child td { border-bottom: none; }
+    .badge { display: inline-block; padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .badge.ok { background: rgba(23, 155, 77, 0.12); color: var(--success); }
+    .badge.wait { background: rgba(0, 46, 82, 0.08); color: var(--biemme-dark); }
+    .badge.warn { background: rgba(217, 119, 6, 0.12); color: var(--warning); }
+    .name-link { background: none; border: none; padding: 0; margin: 0; color: var(--biemme-dark); font-weight: 700; cursor: pointer; text-align: left; width: auto; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 9999; }
+    .modal-card { background: white; width: 100%; max-width: 460px; border-radius: 22px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); color: var(--biemme-text); }
+    .modal-title { font-size: 22px; font-weight: 700; color: var(--biemme-dark); margin-bottom: 10px; }
+    .modal-text { font-size: 14px; color: var(--biemme-muted); margin-bottom: 16px; }
+    .modal-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .modal-actions button { margin: 0; flex: 1; }
+    @media (max-width: 480px) {
+      .brand-text .title { font-size: 24px; }
+      .date-box h2, .summary-value, .status-time { font-size: 20px; }
+      .action-text .big, .status-label { font-size: 19px; }
+      .history-time { font-size: 18px; }
+      .admin-actions button, .modal-actions button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="app-shell">
+      <div class="topbar">
+        <div class="brand">
+          <img src="logo.jpg" alt="BIEMME Engineering" />
+          <div class="brand-text">
+            <div class="title">BIEMME</div>
+            <div class="subtitle">ENGINEERING</div>
+          </div>
+        </div>
+        <div id="userPill" class="user-pill hidden"></div>
+      </div>
+
+      <div class="card" id="loginSection">
+        <h1 class="login-title">BIEMMEAPP</h1>
+        <div class="login-subtitle">Accedi con la tua email registrata</div>
+        <input type="email" id="email" placeholder="Email" />
+        <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px;">
+          <input type="password" id="password" placeholder="Password" style="margin:0;" />
+          <button type="button" class="btn-secondary" onclick="togglePassword()" style="width:auto; min-width:110px; margin:0;">Mostra</button>
+        </div>
+        <button class="btn-primary" onclick="login()">Accedi</button>
+        <button class="btn-secondary" onclick="inviaResetPassword()">Password dimenticata?</button>
+        <div class="msg" id="msgBox"></div>
+      </div>
+
+      <div class="card hidden" id="resetPasswordSection">
+        <h1 class="login-title">Nuova password</h1>
+        <div class="login-subtitle">Inserisci la nuova password e conferma.</div>
+        <input type="password" id="resetNewPassword" placeholder="Nuova password" />
+        <input type="password" id="resetConfirmPassword" placeholder="Conferma nuova password" />
+        <button class="btn-primary" onclick="salvaNuovaPasswordDaReset()">Salva nuova password</button>
+        <button class="btn-secondary" onclick="tornaAlLogin()">Torna al login</button>
+        <div class="msg" id="resetMsgBox"></div>
+      </div>
+
+      <div id="employeeSection" class="hidden">
+        <div class="card">
+          <div class="date-box">
+            <div class="date-icon">📅</div>
+            <div>
+              <h2 id="oggiData">Oggi</h2>
+              <p id="oggiGiorno">--</p>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
+            <button class="btn-secondary" onclick="refreshDashboardDipendente()" style="margin:0; width:auto; min-width:220px;">Aggiorna schermata</button>
+          </div>
+
+          <button class="action-button" onclick="salvaTimbratura('entrata')">
+            <div class="action-icon">↪</div>
+            <div class="action-text"><span class="big">ENTRATA</span><span class="small">Timbra entrata</span></div>
+          </button>
+
+          <button class="action-button" onclick="salvaTimbratura('uscita')">
+            <div class="action-icon">↩</div>
+            <div class="action-text"><span class="big">USCITA</span><span class="small">Timbra uscita</span></div>
+          </button>
+
+          <div class="status-card">
+            <div class="status-title">Stato di oggi</div>
+            <div class="status-row"><div class="status-left"><div id="entrataIcon" class="status-icon wait">↪</div><div><div class="status-label">Entrata</div><div id="entrataSub" class="status-sub">Non ancora registrata</div></div></div><div id="entrataTime" class="status-time wait">--:--</div></div>
+            <div class="status-row"><div class="status-left"><div id="uscitaIcon" class="status-icon wait">↩</div><div><div class="status-label">Uscita</div><div id="uscitaSub" class="status-sub">Non ancora registrata</div></div></div><div id="uscitaTime" class="status-time wait">--:--</div></div>
+          </div>
+
+          <div class="summary-card">
+            <div class="summary-title">Riepilogo generale</div>
+            <div class="summary-grid">
+              <div class="summary-box"><div class="summary-label">Ore previste al giorno</div><div id="orePreviste" class="summary-value">0.00 h</div></div>
+              <div class="summary-box"><div class="summary-label">Ore lavorate oggi</div><div id="oreOggi" class="summary-value">0.00 h</div></div>
+              <div class="summary-box"><div class="summary-label">Delta di oggi</div><div id="deltaOggi" class="summary-value">0.00 h</div></div>
+              <div class="summary-box"><div class="summary-label">Saldo iniziale</div><div id="saldoIniziale" class="summary-value">0.00 h</div></div>
+              <div class="summary-box full"><div class="summary-label">Saldo totale</div><div id="saldoTotale" class="summary-value">0.00 h</div></div>
+            </div>
+          </div>
+
+          <div class="summary-card">
+            <div class="summary-title">Riepilogo mensile</div>
+            <div class="month-selector"><input type="month" id="meseRiferimento" onchange="calcolaRiepilogoMensile()" /></div>
+            <div class="summary-grid">
+              <div class="summary-box"><div class="summary-label">Ore lavorate mese</div><div id="oreMese" class="summary-value">0.00 h</div></div>
+              <div class="summary-box"><div class="summary-label">Delta mese</div><div id="deltaMese" class="summary-value">0.00 h</div></div>
+              <div class="summary-box"><div class="summary-label">Giorni lavorati mese</div><div id="giorniLavoratiMese" class="summary-value">0</div></div>
+              <div class="summary-box"><div class="summary-label">Trasferte mese</div><div id="trasferteMese" class="summary-value">0</div></div>
+            </div>
+          </div>
+
+          
+
+          <div class="history-card">
+            <button class="btn-secondary" onclick="toggleHistory()" style="margin:0; display:flex; justify-content:space-between; align-items:center;">
+              <span>Ultime timbrature</span><span id="historyToggleIcon">▼</span>
+            </button>
+            <div id="historyList" class="history-list hidden" style="margin-top:14px;"><div class="empty-history">Nessuna timbratura disponibile</div></div>
+          </div>
+          <div class="msg" id="appMsgBox"></div>
+        </div>
+        <button class="btn-logout" onclick="logout()">Logout</button>
+      </div>
+
+      <div id="adminSection" class="hidden">
+        <div class="card">
+          <div class="date-box"><div class="date-icon">📊</div><div><h2>Dashboard dipendenti</h2><p>Controllo generale timbrature e riepiloghi</p></div></div>
+
+          <div style="display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
+          </div>
+
+          <div class="summary-card">
+            <div class="summary-title">Oggi</div>
+            <div class="admin-table-wrap"><table><thead><tr><th>Dipendente</th><th>Entrata</th><th>Uscita</th><th>Ore oggi</th><th>Delta oggi</th><th>Trasferta</th><th>Stato</th></tr></thead><tbody id="adminTodayBody"><tr><td colspan="7">Caricamento...</td></tr></tbody></table></div>
+          </div>
+
+          <div class="summary-card">
+            <div class="summary-title">Riepilogo mensile dipendenti</div>
+            <div class="month-selector"><input type="month" id="adminMeseRiferimento" onchange="caricaDashboardAdmin()" /></div>
+            <div class="admin-actions">
+              <button class="btn-primary" onclick="exportCSV()">Esporta mese in Excel</button>
+              <button class="btn-secondary" onclick="caricaDashboardAdmin()">Aggiorna dashboard</button>
+            </div>
+            <div class="admin-table-wrap"><table><thead><tr><th>Dipendente</th><th>Ore mese</th><th>Delta mese</th><th>Trasferte mese</th><th>Saldo totale</th></tr></thead><tbody id="adminMonthBody"><tr><td colspan="5">Caricamento...</td></tr></tbody></table></div>
+          </div>
+
+          <div class="summary-card">
+            <div class="summary-title">Dettaglio dipendente</div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
+              <input type="number" step="0.01" id="saldoInizialeAdminInput" placeholder="Saldo iniziale ore" style="max-width:220px; margin:0;" />
+              <button class="btn-primary" style="width:auto; min-width:220px; margin:0;" onclick="salvaSaldoInizialeAdmin()">Salva saldo iniziale</button>
+            </div>
+            <div id="dettaglioDipendenteTitolo" class="summary-label" style="margin-bottom:12px;">Seleziona un dipendente dalla tabella mensile</div>
+            <div id="adminEditTimbraturaBox" class="detail-empty hidden" style="margin-bottom:14px; text-align:left;">
+              <input type="hidden" id="editTimbraturaEmail" />
+              <input type="hidden" id="editTimbraturaNome" />
+              <label>Data</label>
+              <input type="date" id="editTimbraturaData" />
+              <label>Ora entrata</label>
+              <input type="time" id="editOraEntrata" />
+              <label>Ora uscita</label>
+              <input type="time" id="editOraUscita" />
+              <label style="display:flex; align-items:center; gap:10px; font-weight:700; color:#002e52; margin-bottom:12px;">
+                <input type="checkbox" id="editTrasferta" style="width:22px; height:22px; margin:0;" /> Trasferta
+              </label>
+              <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button class="btn-primary" style="width:auto; min-width:220px; margin:0;" onclick="salvaTimbraturaAdmin()">Salva modifica timbrature</button>
+                <button class="btn-secondary" style="width:auto; min-width:220px; margin:0;" onclick="eliminaGiornataAdmin()">Elimina giornata</button>
+                <button class="btn-secondary" style="width:auto; min-width:220px; margin:0;" onclick="chiudiEditorTimbraturaAdmin()">Chiudi modifica</button>
+              </div>
+            </div>
+            <div id="dettaglioBox" class="detail-empty">Nessun dipendente selezionato</div>
+          </div>
+
+          <div class="summary-card">
+            <div class="summary-title">Chiusura aziendale</div>
+            <input type="hidden" id="chiusuraEditId" value="" />
+            <input type="date" id="chiusuraInizio" />
+            <input type="date" id="chiusuraFine" />
+            <textarea id="chiusuraNota" placeholder="Nota opzionale"></textarea>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="btn-primary" onclick="salvaChiusuraAziendale()" style="width:auto; min-width:220px; margin:0;">Salva chiusura</button>
+              <button class="btn-secondary" onclick="resetFormChiusura()" style="width:auto; min-width:220px; margin:0;">Nuova chiusura</button>
+            </div>
+            <div id="listaChiusure" class="list-box">Nessuna chiusura inserita</div>
+          </div>
+
+          <div class="summary-card">
+            <div class="summary-title">Ferie / assenze dipendenti</div>
+            <input type="hidden" id="assenzaEditId" value="" />
+            <select id="assenzaDipendente"></select>
+            <input type="date" id="assenzaInizio" />
+            <input type="date" id="assenzaFine" />
+            <select id="assenzaTipo">
+              <option value="ferie">Ferie</option>
+              <option value="permesso">Permesso</option>
+              <option value="malattia">Malattia</option>
+            </select>
+            <textarea id="assenzaNota" placeholder="Nota opzionale"></textarea>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="btn-primary" onclick="salvaAssenzaDipendente()" style="width:auto; min-width:220px; margin:0;">Salva assenza</button>
+              <button class="btn-secondary" onclick="resetFormAssenza()" style="width:auto; min-width:220px; margin:0;">Nuova assenza</button>
+            </div>
+            <div id="listaAssenze" class="list-box">Nessuna assenza inserita</div>
+          </div>
+
+          
+          <div class="msg" id="adminMsgBox"></div>
+        </div>
+        <button class="btn-logout" onclick="logout()">Logout</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="seraleModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-title">Lavoro serale</div>
+      <div class="modal-text">Hai timbrato l'entrata dopo le 12:00. È previsto un lavoro serale con timbratura di uscita dopo le 23:30?</div>
+      <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:16px;">
+        <label style="display:flex; align-items:center; gap:10px; font-weight:700; color:#002e52;"><input type="radio" name="seraleScelta" value="si" id="seraleSi" style="width:22px; height:22px; margin:0;" />Sì</label>
+        <label style="display:flex; align-items:center; gap:10px; font-weight:700; color:#002e52;"><input type="radio" name="seraleScelta" value="no" id="seraleNo" style="width:22px; height:22px; margin:0;" />No</label>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="chiudiModalSerale(null)">Annulla</button>
+        <button class="btn-primary" onclick="confermaSceltaSerale()">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = "https://vdxmodaowhihureuuojx.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_fzXu9VR2_PhbhnBJWHVviQ_6S5tL1d-";
+    const SEDE_LAT = 45.6501;
+    const SEDE_LNG = 9.2187;
+    const SOGLIA_TRASFERTA_KM = 50;
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
+      }
+    });
+
+    let currentUser = null;
+    let currentDipendente = null;
+    let selectedDetailEmail = null;
+    let selectedDetailNome = null;
+    let modalResolver = null;
+    let cachedDipendenti = [];
+    let cachedChiusure = [];
+    let cachedAssenze = [];
+    let cachedStartDates = {};
+
+    const pad = (n) => String(n).padStart(2, '0');
+    const isoDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+    function formatDataIt(date) { return new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }).format(date); }
+    function formatGiornoIt(date) { return new Intl.DateTimeFormat('it-IT', { weekday: 'long' }).format(date); }
+    function formatDataBreve(timestamp) { return new Date(timestamp).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
+    function formatOra(timestamp) { return new Date(timestamp).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }); }
+    function formatOre(value) { return Number(value || 0).toFixed(2) + ' h'; }
+    function formatOreSigned(value) { const n = Number(value || 0); return (n > 0 ? '+' : '') + n.toFixed(2) + ' h'; }
+
+    function aggiornaDataOggi() {
+      const now = new Date();
+      const oggiData = document.getElementById('oggiData');
+      const oggiGiorno = document.getElementById('oggiGiorno');
+      if (oggiData) oggiData.textContent = 'Oggi, ' + formatDataIt(now);
+      if (oggiGiorno) {
+        const g = formatGiornoIt(now);
+        oggiGiorno.textContent = g.charAt(0).toUpperCase() + g.slice(1);
+      }
+    }
+
+    function impostaMeseCorrente() {
+      const now = new Date();
+      const value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+      const meseRiferimento = document.getElementById('meseRiferimento');
+      const adminMeseRiferimento = document.getElementById('adminMeseRiferimento');
+      if (meseRiferimento) meseRiferimento.value = value;
+      if (adminMeseRiferimento) adminMeseRiferimento.value = value;
+    }
+
+    function attraversaPausa(entrataDate, uscitaDate) {
+      const entrataOra = entrataDate.getHours() + entrataDate.getMinutes() / 60;
+      const uscitaOra = uscitaDate.getHours() + uscitaDate.getMinutes() / 60;
+      return entrataOra < 13 && uscitaOra >= 14;
+    }
+
+    function diffOreConPausa(entrataDate, uscitaDate) {
+      let oreTotali = (uscitaDate - entrataDate) / 1000 / 60 / 60;
+      if (attraversaPausa(entrataDate, uscitaDate)) oreTotali -= 1;
+      return oreTotali < 0 ? 0 : oreTotali;
+    }
+
+    function isWeekend(dateStr) {
+      const d = new Date(dateStr + 'T12:00:00');
+      const day = d.getDay();
+      return day === 0 || day === 6;
+    }
+
+    function getFestivi(anno) {
+      const fissi = [
+        `${anno}-01-01`, `${anno}-01-06`, `${anno}-04-25`, `${anno}-05-01`, `${anno}-06-02`,
+        `${anno}-08-15`, `${anno}-11-01`, `${anno}-12-08`, `${anno}-12-25`, `${anno}-12-26`
+      ];
+      function calcolaPasqua(y) {
+        const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451), mese = Math.floor((h + l - 7 * m + 114) / 31), giorno = ((h + l - 7 * m + 114) % 31) + 1;
+        return new Date(y, mese - 1, giorno);
+      }
+      const pasqua = calcolaPasqua(anno);
+      const pasquetta = new Date(pasqua);
+      pasquetta.setDate(pasqua.getDate() + 1);
+      return [...fissi, isoDate(pasqua), isoDate(pasquetta)];
+    }
+
+    function isFestivo(dateStr) {
+      return getFestivi(new Date(dateStr + 'T12:00:00').getFullYear()).includes(dateStr);
+    }
+
+    function haversineKm(lat1, lon1, lat2, lon2) {
+      const toRad = (deg) => deg * Math.PI / 180;
+      const R = 6371;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+      return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function isTrasfertaFromUscita(recordUscita) {
+      if (!recordUscita) return false;
+      if (recordUscita.in_trasferta === true) return true;
+      if (recordUscita.lat == null || recordUscita.lng == null) return false;
+      return haversineKm(Number(recordUscita.lat), Number(recordUscita.lng), SEDE_LAT, SEDE_LNG) > SOGLIA_TRASFERTA_KM;
+    }
+
+    function aggiornaValore(id, value, signed = false) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = signed ? formatOreSigned(value) : formatOre(value);
+      el.classList.remove('positive', 'negative');
+      if (signed) {
+        if (value > 0) el.classList.add('positive');
+        if (value < 0) el.classList.add('negative');
+      }
+    }
+
+    function mostraMessaggio(testo, errore = false, boxId = 'msgBox') {
+      const msgBox = document.getElementById(boxId);
+      if (!msgBox) return;
+      msgBox.style.display = 'block';
+      msgBox.textContent = testo;
+      msgBox.style.background = errore ? '#ffe9e9' : '#e9fff1';
+      msgBox.style.color = errore ? '#8a1f1f' : '#166534';
+      msgBox.style.border = errore ? '1px solid #f5b5b5' : '1px solid #bde6c9';
+    }
+
+    function clearMessaggio(boxId = 'appMsgBox') {
+      const msgBox = document.getElementById(boxId);
+      if (!msgBox) return;
+      msgBox.style.display = 'none';
+      msgBox.textContent = '';
+    }
+
+    function getDateRangeFromMonth(monthValue) {
+      const [anno, mese] = monthValue.split('-');
+      const startDate = `${anno}-${mese}-01`;
+      const endDateObj = new Date(Number(anno), Number(mese), 0);
+      return { startDate, endDate: `${anno}-${mese}-${pad(endDateObj.getDate())}` };
+    }
+
+    function getPreviousDateString(dateStr) {
+      const d = new Date(dateStr + 'T12:00:00');
+      d.setDate(d.getDate() - 1);
+      return isoDate(d);
+    }
+
+    function buildLocalDateTime(dateStr, hours, minutes) {
+      const d = new Date(dateStr + 'T00:00:00');
+      d.setHours(hours, minutes, 0, 0);
+      return d;
+    }
+
+    function raggruppaTimbraturePerGiorno(data) {
+      const perGiorno = {};
+      (data || []).forEach(r => {
+        if (!perGiorno[r.data_lavoro]) perGiorno[r.data_lavoro] = { entrata: null, uscita: null };
+        if (r.tipo === 'entrata' && !perGiorno[r.data_lavoro].entrata) perGiorno[r.data_lavoro].entrata = r;
+        if (r.tipo === 'uscita' && !perGiorno[r.data_lavoro].uscita) perGiorno[r.data_lavoro].uscita = r;
+      });
+      return perGiorno;
+    }
+
+    async function loadStartDates() {
+      const { data, error } = await client.from('timbrature').select('email, data_lavoro').order('data_lavoro', { ascending: true });
+      if (error) throw error;
+      const map = {};
+      (data || []).forEach(r => {
+        if (!map[r.email]) map[r.email] = r.data_lavoro;
+      });
+      cachedStartDates = map;
+    }
+
+    function getEmployeeStartDate(email) {
+      return cachedStartDates[email] || null;
+    }
+
+    function getPosizione() {
+      return new Promise((resolve) => {
+        if (!navigator.geolocation) return resolve({ lat: null, lng: null, indirizzo: null });
+        navigator.geolocation.getCurrentPosition(
+          (position) => resolve({ lat: Number(position.coords.latitude.toFixed(7)), lng: Number(position.coords.longitude.toFixed(7)), indirizzo: null }),
+          () => resolve({ lat: null, lng: null, indirizzo: null }),
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      });
+    }
+
+    function apriModalSerale() {
+      return new Promise((resolve) => {
+        modalResolver = resolve;
+        document.getElementById('seraleSi').checked = false;
+        document.getElementById('seraleNo').checked = false;
+        document.getElementById('seraleModal').classList.remove('hidden');
+      });
+    }
+
+    function chiudiModalSerale(scelta) {
+      document.getElementById('seraleModal').classList.add('hidden');
+      if (!modalResolver) return;
+      if (scelta === null) modalResolver({ confirmed: false, serale: false });
+      else modalResolver({ confirmed: true, serale: scelta === 'si' });
+      modalResolver = null;
+    }
+
+    function confermaSceltaSerale() {
+      if (document.getElementById('seraleSi').checked) return chiudiModalSerale('si');
+      if (document.getElementById('seraleNo').checked) return chiudiModalSerale('no');
+      alert('Seleziona Sì oppure No.');
+    }
+
+    function togglePassword() { const input = document.getElementById('password'); input.type = input.type === 'password' ? 'text' : 'password'; }
+    function toggleNewPasswords() {
+      const p1 = document.getElementById('newPassword');
+      const p2 = document.getElementById('confirmPassword');
+      const type = p1.type === 'password' ? 'text' : 'password';
+      p1.type = type; p2.type = type;
+    }
+    function toggleAdminPasswords() {
+      const p1 = document.getElementById('newPasswordAdmin');
+      const p2 = document.getElementById('confirmPasswordAdmin');
+      if (!p1 || !p2) return;
+      const type = p1.type === 'password' ? 'text' : 'password';
+      p1.type = type; p2.type = type;
+    }
+
+    function toggleHistory() {
+      const list = document.getElementById('historyList');
+      const icon = document.getElementById('historyToggleIcon');
+      if (!list) return;
+      list.classList.toggle('hidden');
+      if (icon) icon.textContent = list.classList.contains('hidden') ? '▼' : '▲';
+    }
+
+    async function inviaResetPassword() {
+      const email = document.getElementById('email').value.trim();
+      if (!email) return mostraMessaggio('Inserisci prima la tua email, poi clicca Password dimenticata.', true, 'msgBox');
+      const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+      if (error) return mostraMessaggio('Errore invio reset password: ' + error.message, true, 'msgBox');
+      mostraMessaggio('Email di recupero inviata. Controlla la posta e apri il link ricevuto.', false, 'msgBox');
+    }
+
+    function mostraResetPassword() {
+      document.getElementById('loginSection').classList.add('hidden');
+      document.getElementById('employeeSection').classList.add('hidden');
+      document.getElementById('adminSection').classList.add('hidden');
+      document.getElementById('resetPasswordSection').classList.remove('hidden');
+    }
+
+    function tornaAlLogin() {
+      document.getElementById('resetPasswordSection').classList.add('hidden');
+      document.getElementById('loginSection').classList.remove('hidden');
+    }
+
+    async function salvaNuovaPasswordDaReset() {
+      const newPassword = document.getElementById('resetNewPassword').value || '';
+      const confirmPassword = document.getElementById('resetConfirmPassword').value || '';
+      if (!newPassword || !confirmPassword) return mostraMessaggio('Inserisci e conferma la nuova password.', true, 'resetMsgBox');
+      if (newPassword !== confirmPassword) return mostraMessaggio('Le password non coincidono.', true, 'resetMsgBox');
+      if (newPassword.length < 6) return mostraMessaggio('La password deve avere almeno 6 caratteri.', true, 'resetMsgBox');
+      const { error } = await client.auth.updateUser({ password: newPassword });
+      if (error) return mostraMessaggio('Errore cambio password: ' + error.message, true, 'resetMsgBox');
+      document.getElementById('resetNewPassword').value = '';
+      document.getElementById('resetConfirmPassword').value = '';
+      mostraMessaggio('Password aggiornata. Ora puoi accedere con la nuova password.', false, 'resetMsgBox');
+      setTimeout(async () => { await client.auth.signOut(); tornaAlLogin(); }, 1200);
+    }
+
+    async function login() {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value.trim();
+      if (!email || !password) return mostraMessaggio('Inserisci email e password.', true, 'msgBox');
+      const { error } = await client.auth.signInWithPassword({ email, password });
+      if (error) mostraMessaggio('Errore login: ' + error.message, true, 'msgBox');
+      else await controllaSessione();
+    }
+
+    async function logout() {
+      await client.auth.signOut();
+      document.getElementById('resetPasswordSection').classList.add('hidden');
+      currentUser = null;
+      currentDipendente = null;
+      selectedDetailEmail = null;
+      selectedDetailNome = null;
+      document.getElementById('loginSection').classList.remove('hidden');
+      document.getElementById('employeeSection').classList.add('hidden');
+      document.getElementById('adminSection').classList.add('hidden');
+      document.getElementById('userPill').classList.add('hidden');
+      mostraMessaggio('Logout effettuato.', false, 'msgBox');
+    }
+
+    async function loadAdminMeta() {
+      const [dipRes, chiRes, assRes, startRes] = await Promise.all([
+        client.from('dipendenti').select('nome, email, ore_giornaliere_previste, saldo_iniziale_ore, is_admin, attivo').eq('attivo', true).order('nome', { ascending: true }),
+        client.from('chiusure_aziendali').select('*').order('data_inizio', { ascending: true }),
+        client.from('assenze_dipendenti').select('*').order('data_inizio', { ascending: true }),
+        client.from('timbrature').select('email, data_lavoro').order('data_lavoro', { ascending: true })
+      ]);
+      if (dipRes.error) throw dipRes.error;
+      if (chiRes.error) throw chiRes.error;
+      if (assRes.error) throw assRes.error;
+      if (startRes.error) throw startRes.error;
+      cachedDipendenti = dipRes.data || [];
+      cachedChiusure = chiRes.data || [];
+      cachedAssenze = assRes.data || [];
+      cachedStartDates = {};
+      (startRes.data || []).forEach(r => { if (!cachedStartDates[r.email]) cachedStartDates[r.email] = r.data_lavoro; });
+    }
+
+    function isChiusuraAziendale(dateStr) {
+      return cachedChiusure.some(c => c.data_inizio <= dateStr && c.data_fine >= dateStr);
+    }
+
+    function getAssenzaDipendente(email, dateStr) {
+      return cachedAssenze.find(a => a.email === email && a.data_inizio <= dateStr && a.data_fine >= dateStr) || null;
+    }
+
+    function getDayContext(email, dateStr) {
+      const chiusura = isChiusuraAziendale(dateStr);
+      const assenza = getAssenzaDipendente(email, dateStr);
+      const weekend = isWeekend(dateStr);
+      const festivo = isFestivo(dateStr);
+      const nonLavorativo = weekend || festivo || chiusura;
+      return { weekend, festivo, chiusura, assenza, nonLavorativo };
+    }
+
+    function getEffectiveUscitaRecord(dayKey, dayRecord, now = new Date()) {
+      if (dayRecord.uscita) return dayRecord.uscita;
+      if (!dayRecord.entrata) return null;
+      if (dayRecord.entrata.lavoro_serale_previsto) return null;
+      const cutoff = buildLocalDateTime(dayKey, 23, 30);
+      if (now > cutoff) {
+        const autoDate = buildLocalDateTime(dayKey, 16, 30);
+        return { tipo: 'uscita', data_lavoro: dayKey, ora: autoDate.toISOString(), created_at: autoDate.toISOString(), lat: null, lng: null, auto_generata: true };
+      }
+      return null;
+    }
+
+    function evaluateDay(email, giorno, record, orePreviste, now = new Date()) {
+      const ctx = getDayContext(email, giorno);
+      const uscitaEffettiva = getEffectiveUscitaRecord(giorno, record, now);
+      const result = { ore: 0, delta: 0, trasferta: false, stato: 'vuoto', note: [], uscitaEffettiva, context: ctx };
+      if (ctx.weekend) result.note.push('Weekend');
+      if (ctx.festivo) result.note.push('Festivo');
+      if (ctx.chiusura) result.note.push('Chiusura aziendale');
+      if (ctx.assenza) result.note.push(ctx.assenza.tipo);
+
+      if (record.entrata && uscitaEffettiva) {
+        const entrataDate = new Date(record.entrata.ora || record.entrata.created_at);
+        const uscitaDate = new Date(uscitaEffettiva.ora || uscitaEffettiva.created_at);
+        const lavorate = diffOreConPausa(entrataDate, uscitaDate);
+        result.ore = lavorate;
+        result.trasferta = isTrasfertaFromUscita(uscitaEffettiva);
+        if (ctx.assenza && !ctx.chiusura && !ctx.weekend && !ctx.festivo) {
+          result.delta = 0;
+          result.stato = 'anomalia_assenza';
+          result.note.push('Anomalia: timbratura su assenza');
+        } else if (ctx.nonLavorativo) {
+          result.delta = lavorate;
+          result.stato = 'straordinario';
+        } else {
+          result.delta = lavorate - orePreviste;
+          result.stato = 'lavorativo';
+        }
+        if (uscitaEffettiva.auto_generata) result.note.push('Auto 16:30');
+        if (record.entrata.lavoro_serale_previsto) result.note.push('Serale');
+        return result;
+      }
+
+      if (record.entrata && !uscitaEffettiva) {
+        if (record.entrata.lavoro_serale_previsto) {
+          result.stato = 'serale_aperto';
+          result.note.push('Serale aperto');
+        } else {
+          result.stato = 'solo_entrata';
+          result.note.push('Solo entrata');
+        }
+        return result;
+      }
+
+      if (!record.entrata && !record.uscita) {
+        if (ctx.assenza || ctx.nonLavorativo) {
+          result.delta = 0;
+          result.stato = 'escluso';
+        } else {
+          result.delta = -orePreviste;
+          result.stato = 'assenza_non_timbrata';
+          result.note.push('Nessuna timbratura');
+        }
+      }
+
+      return result;
+    }
+
+    function renderListaChiusure() {
+      const box = document.getElementById('listaChiusure');
+      if (!box) return;
+      if (!cachedChiusure.length) return box.innerHTML = 'Nessuna chiusura inserita';
+      box.innerHTML = cachedChiusure.map(c => `
+        <div style="text-align:left; padding:10px 0; border-bottom:1px solid #e5edf5;">
+          <div><strong>${c.data_inizio}</strong> → <strong>${c.data_fine}</strong>${c.nota ? ` - ${c.nota}` : ''}</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+            <button class="btn-secondary" style="width:auto; min-width:120px; margin:0;" onclick="caricaChiusuraPerModifica(${c.id})">Modifica</button>
+            <button class="btn-secondary" style="width:auto; min-width:120px; margin:0;" onclick="eliminaChiusura(${c.id})">Elimina</button>
+          </div>
+        </div>`).join('');
+    }
+
+    function renderListaAssenze() {
+      const box = document.getElementById('listaAssenze');
+      if (!box) return;
+      if (!cachedAssenze.length) return box.innerHTML = 'Nessuna assenza inserita';
+      box.innerHTML = cachedAssenze.map(a => `
+        <div style="text-align:left; padding:10px 0; border-bottom:1px solid #e5edf5;">
+          <div><strong>${a.email}</strong> - ${a.tipo} - <strong>${a.data_inizio}</strong> → <strong>${a.data_fine}</strong>${a.nota ? ` - ${a.nota}` : ''}</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+            <button class="btn-secondary" style="width:auto; min-width:120px; margin:0;" onclick="caricaAssenzaPerModifica(${a.id})">Modifica</button>
+            <button class="btn-secondary" style="width:auto; min-width:120px; margin:0;" onclick="eliminaAssenza(${a.id})">Elimina</button>
+          </div>
+        </div>`).join('');
+    }
+
+    function popolaSelectDipendenti() {
+      const select = document.getElementById('assenzaDipendente');
+      if (!select) return;
+      const dip = cachedDipendenti.filter(d => !d.is_admin);
+      select.innerHTML = dip.map(d => `<option value="${d.email}">${d.nome} - ${d.email}</option>`).join('');
+    }
+
+    async function controllaSessione() {
+      const { data } = await client.auth.getUser();
+      const user = data?.user;
+      if (!user) {
+        document.getElementById('resetPasswordSection').classList.add('hidden');
+        document.getElementById('loginSection').classList.remove('hidden');
+        document.getElementById('employeeSection').classList.add('hidden');
+        document.getElementById('adminSection').classList.add('hidden');
+        document.getElementById('userPill').classList.add('hidden');
+        return;
+      }
+
+      currentUser = user;
+      const { data: dipendente, error } = await client.from('dipendenti').select('id, nome, email, attivo, is_admin, ore_giornaliere_previste, saldo_iniziale_ore').eq('email', user.email).eq('attivo', true).single();
+      if (error || !dipendente) {
+        document.getElementById('loginSection').classList.remove('hidden');
+        document.getElementById('employeeSection').classList.add('hidden');
+        document.getElementById('adminSection').classList.add('hidden');
+        document.getElementById('userPill').classList.add('hidden');
+        mostraMessaggio('Utente autenticato ma non presente nella tabella dipendenti.', true, 'msgBox');
+        return;
+      }
+
+      currentDipendente = dipendente;
+      document.getElementById('loginSection').classList.add('hidden');
+      const userPill = document.getElementById('userPill');
+      userPill.textContent = dipendente.nome + ' - ' + dipendente.email;
+      userPill.classList.remove('hidden');
+
+      if (dipendente.is_admin) {
+        document.getElementById('employeeSection').classList.add('hidden');
+        document.getElementById('adminSection').classList.remove('hidden');
+        await caricaDashboardAdmin();
+        mostraMessaggio('Accesso amministratore effettuato.', false, 'adminMsgBox');
+      } else {
+        await loadAdminMeta();
+        document.getElementById('adminSection').classList.add('hidden');
+        document.getElementById('employeeSection').classList.remove('hidden');
+        await refreshDashboardDipendente();
+        mostraMessaggio('Accesso effettuato.', false, 'appMsgBox');
+      }
+    }
+
+    async function refreshDashboardDipendente() {
+      clearMessaggio('appMsgBox');
+      await loadAdminMeta();
+      await caricaStatoOggi();
+      await caricaStorico();
+      await calcolaRiepilogoOre();
+      await calcolaRiepilogoMensile();
+    }
+
+    async function caricaStatoOggi() {
+      const oggi = isoDate(new Date());
+      const { data, error } = await client.from('timbrature').select('tipo, ora, created_at, in_trasferta, lat, lng, lavoro_serale_previsto, data_lavoro').eq('email', currentUser.email).eq('data_lavoro', oggi).order('ora', { ascending: true });
+      if (error) return mostraMessaggio('Errore caricamento stato: ' + error.message, true, 'appMsgBox');
+      const grouped = raggruppaTimbraturePerGiorno(data);
+      const recordGiorno = grouped[oggi] || { entrata: null, uscita: null };
+      const evalDay = evaluateDay(currentUser.email, oggi, recordGiorno, Number(currentDipendente.ore_giornaliere_previste || 0));
+      aggiornaRigaStato('entrata', recordGiorno.entrata);
+      const uscita = evalDay.uscitaEffettiva;
+      if (uscita) uscita.in_trasferta = evalDay.trasferta;
+      aggiornaRigaStato('uscita', uscita);
+    }
+
+    function aggiornaRigaStato(tipo, record) {
+      const icon = document.getElementById(tipo + 'Icon');
+      const sub = document.getElementById(tipo + 'Sub');
+      const time = document.getElementById(tipo + 'Time');
+      if (!icon || !sub || !time) return;
+      if (record) {
+        icon.className = 'status-icon ok';
+        let suffix = '';
+        if (tipo === 'uscita' && record.in_trasferta) suffix += ' (trasferta)';
+        if (tipo === 'uscita' && record.auto_generata) suffix += ' (auto 16:30)';
+        if (tipo === 'entrata' && record.lavoro_serale_previsto) suffix += ' (serale)';
+        sub.textContent = 'Registrata alle ' + formatOra(record.ora || record.created_at) + suffix;
+        time.textContent = formatOra(record.ora || record.created_at);
+        time.className = 'status-time ok';
+      } else {
+        icon.className = 'status-icon wait';
+        sub.textContent = 'Non ancora registrata';
+        time.textContent = '--:--';
+        time.className = 'status-time wait';
+      }
+    }
+
+    async function caricaStorico() {
+      const { data, error } = await client.from('timbrature').select('tipo, data_lavoro, ora, created_at, lat, lng, in_trasferta, lavoro_serale_previsto').eq('email', currentUser.email).order('ora', { ascending: false }).limit(20);
+      const historyList = document.getElementById('historyList');
+      if (!historyList) return;
+      if (error) return historyList.innerHTML = '<div class="empty-history">Errore nel caricamento storico</div>';
+      if (!data || !data.length) return historyList.innerHTML = '<div class="empty-history">Nessuna timbratura disponibile</div>';
+      historyList.innerHTML = data.map(item => {
+        const tipoLabel = item.tipo === 'entrata' ? 'Entrata' : 'Uscita';
+        const tipoIcon = item.tipo === 'entrata' ? '↪' : '↩';
+        let extra = '';
+        if (item.tipo === 'uscita' && isTrasfertaFromUscita(item)) extra += ' - Trasferta';
+        if (item.tipo === 'entrata' && item.lavoro_serale_previsto) extra += ' - Serale';
+        return `<div class="history-item"><div class="history-left"><div class="history-badge ${item.tipo}">${tipoIcon}</div><div class="history-main"><div class="history-type">${tipoLabel}${extra}</div><div class="history-date">${formatDataBreve(item.ora || item.created_at)}</div></div></div><div class="history-time">${formatOra(item.ora || item.created_at)}</div></div>`;
+      }).join('');
+    }
+
+    async function calcolaRiepilogoOre() {
+      const orePreviste = Number(currentDipendente.ore_giornaliere_previste || 0);
+      const saldoIniziale = Number(currentDipendente.saldo_iniziale_ore || 0);
+      aggiornaValore('orePreviste', orePreviste);
+      aggiornaValore('saldoIniziale', saldoIniziale, true);
+
+      const oggi = isoDate(new Date());
+      const { data, error } = await client
+        .from('timbrature')
+        .select('tipo, data_lavoro, ora, created_at, lat, lng, in_trasferta, lavoro_serale_previsto')
+        .eq('email', currentUser.email)
+        .eq('data_lavoro', oggi)
+        .order('ora', { ascending: true });
+
+      if (error) return mostraMessaggio('Errore calcolo ore: ' + error.message, true, 'appMsgBox');
+
+      const perGiorno = raggruppaTimbraturePerGiorno(data || []);
+      const record = perGiorno[oggi] || { entrata: null, uscita: null };
+      const evalDay = evaluateDay(currentUser.email, oggi, record, orePreviste);
+
+      aggiornaValore('oreOggi', evalDay.ore);
+      aggiornaValore('deltaOggi', evalDay.delta, true);
+      aggiornaValore('saldoTotale', saldoIniziale, true);
+    }
+
+    async function calcolaRiepilogoMensile() {
+      const meseSelezionato = document.getElementById('meseRiferimento').value;
+      if (!meseSelezionato) return;
+      const { startDate, endDate } = getDateRangeFromMonth(meseSelezionato);
+      const orePreviste = Number(currentDipendente.ore_giornaliere_previste || 0);
+      const { data, error } = await client.from('timbrature').select('tipo, data_lavoro, ora, created_at, lat, lng, in_trasferta, lavoro_serale_previsto').eq('email', currentUser.email).gte('data_lavoro', startDate).lte('data_lavoro', endDate).order('data_lavoro', { ascending: true }).order('ora', { ascending: true });
+      if (error) return mostraMessaggio('Errore riepilogo mensile: ' + error.message, true, 'appMsgBox');
+      const perGiorno = raggruppaTimbraturePerGiorno(data);
+      const employeeStart = getEmployeeStartDate(currentUser.email);
+      let oreMese = 0, deltaMese = 0, giorniLavorati = 0, trasferteMese = 0;
+      if (!employeeStart) {
+        aggiornaValore('oreMese', 0);
+        aggiornaValore('deltaMese', 0, true);
+        aggiornaValore('saldoTotale', Number(currentDipendente.saldo_iniziale_ore || 0), true);
+        document.getElementById('giorniLavoratiMese').textContent = '0';
+        document.getElementById('trasferteMese').textContent = '0';
+        return;
+      }
+      const loopStart = employeeStart > startDate ? employeeStart : startDate;
+      const today = isoDate(new Date());
+      const loopEnd = endDate < today ? endDate : today;
+      for (let d = new Date(loopStart + 'T12:00:00'); d <= new Date(loopEnd + 'T12:00:00'); d.setDate(d.getDate() + 1)) {
+        const giorno = isoDate(d);
+        const record = perGiorno[giorno] || { entrata: null, uscita: null };
+        const evalDay = evaluateDay(currentUser.email, giorno, record, orePreviste);
+        deltaMese += evalDay.delta;
+        if (record.entrata && evalDay.uscitaEffettiva) {
+          oreMese += evalDay.ore;
+          giorniLavorati += 1;
+          if (evalDay.trasferta) trasferteMese += 1;
+        }
+      }
+      aggiornaValore('oreMese', oreMese);
+      aggiornaValore('deltaMese', deltaMese, true);
+      aggiornaValore('saldoTotale', Number(currentDipendente.saldo_iniziale_ore || 0) + deltaMese, true);
+      document.getElementById('giorniLavoratiMese').textContent = String(giorniLavorati);
+      document.getElementById('trasferteMese').textContent = String(trasferteMese);
+    }
+
+    async function salvaTimbratura(tipo) {
+      if (!currentUser || !currentDipendente || currentDipendente.is_admin) return mostraMessaggio('Funzione non disponibile.', true, 'appMsgBox');
+      clearMessaggio('appMsgBox');
+      await loadAdminMeta();
+      const now = new Date();
+      const oggi = isoDate(now);
+      let targetDataLavoro = oggi;
+      let lavoroSeralePrevisto = false;
+
+      if (tipo === 'entrata') {
+        const oraIngresso = now.getHours() + (now.getMinutes() / 60);
+        if (oraIngresso >= 12) {
+          const risposta = await apriModalSerale();
+          if (!risposta.confirmed) return mostraMessaggio('Timbratura annullata.', true, 'appMsgBox');
+          lavoroSeralePrevisto = !!risposta.serale;
+        }
+      }
+
+      const { data: timbratureOggi, error: erroreControllo } = await client.from('timbrature').select('id, tipo, data_lavoro, ora, created_at, lavoro_serale_previsto').eq('email', currentUser.email).eq('data_lavoro', oggi).order('ora', { ascending: true });
+      if (erroreControllo) return mostraMessaggio('Errore controllo timbrature: ' + erroreControllo.message, true, 'appMsgBox');
+      const haEntrataOggi = timbratureOggi.some(t => t.tipo === 'entrata');
+      const haUscitaOggi = timbratureOggi.some(t => t.tipo === 'uscita');
+      if (tipo === 'entrata' && haEntrataOggi) return mostraMessaggio("Hai già registrato l'entrata di oggi.", true, 'appMsgBox');
+
+      if (tipo === 'uscita') {
+        if (haEntrataOggi && !haUscitaOggi) {
+          targetDataLavoro = oggi;
+        } else {
+          const ieri = getPreviousDateString(oggi);
+          const { data: timbratureIeri, error: erroreIeri } = await client.from('timbrature').select('id, tipo, data_lavoro, ora, created_at, lavoro_serale_previsto').eq('email', currentUser.email).eq('data_lavoro', ieri).order('ora', { ascending: true });
+          if (erroreIeri) return mostraMessaggio('Errore controllo turno serale: ' + erroreIeri.message, true, 'appMsgBox');
+          const entrataIeri = timbratureIeri.find(t => t.tipo === 'entrata');
+          const uscitaIeri = timbratureIeri.find(t => t.tipo === 'uscita');
+          if (entrataIeri && !uscitaIeri && entrataIeri.lavoro_serale_previsto) targetDataLavoro = ieri;
+          else return mostraMessaggio("Non puoi registrare l'uscita senza aver timbrato prima l'entrata.", true, 'appMsgBox');
+        }
+        const { data: checkTarget, error: checkTargetErr } = await client.from('timbrature').select('tipo').eq('email', currentUser.email).eq('data_lavoro', targetDataLavoro);
+        if (checkTargetErr) return mostraMessaggio('Errore controllo timbrature: ' + checkTargetErr.message, true, 'appMsgBox');
+        const targetHaEntrata = checkTarget.some(t => t.tipo === 'entrata');
+        const targetHaUscita = checkTarget.some(t => t.tipo === 'uscita');
+        if (!targetHaEntrata) return mostraMessaggio("Non puoi registrare l'uscita senza aver timbrato prima l'entrata.", true, 'appMsgBox');
+        if (targetHaUscita) return mostraMessaggio("Hai già registrato l'uscita per questo turno.", true, 'appMsgBox');
+      }
+
+      mostraMessaggio('Recupero posizione GPS...', false, 'appMsgBox');
+      const posizione = await getPosizione();
+      let inTrasferta = false;
+      if (tipo === 'uscita' && posizione.lat != null && posizione.lng != null) {
+        inTrasferta = haversineKm(posizione.lat, posizione.lng, SEDE_LAT, SEDE_LNG) > SOGLIA_TRASFERTA_KM;
+      }
+
+      const payload = { dipendente: currentDipendente.nome, email: currentUser.email, tipo, data_lavoro: targetDataLavoro, lat: posizione.lat, lng: posizione.lng, indirizzo: posizione.indirizzo, in_trasferta: inTrasferta };
+      if (tipo === 'entrata') payload.lavoro_serale_previsto = lavoroSeralePrevisto;
+      const { error } = await client.from('timbrature').insert([payload]);
+      if (error) return mostraMessaggio('Errore salvataggio: ' + error.message, true, 'appMsgBox');
+
+      let extra = posizione.lat && posizione.lng ? ' GPS salvato.' : ' GPS non disponibile.';
+      if (tipo === 'uscita' && inTrasferta) extra += ' Uscita classificata come trasferta.';
+      if (tipo === 'entrata' && lavoroSeralePrevisto) extra += ' Turno serale registrato.';
+      if (tipo === 'uscita' && targetDataLavoro !== oggi) extra += ' Uscita agganciata al turno del giorno precedente.';
+      mostraMessaggio('Timbratura ' + tipo + ' salvata correttamente.' + extra, false, 'appMsgBox');
+      await refreshDashboardDipendente();
+    }
+
+    async function caricaDashboardAdmin() {
+      if (!currentDipendente?.is_admin) return;
+      clearMessaggio('adminMsgBox');
+      try {
+        await loadAdminMeta();
+      } catch (e) {
+        return mostraMessaggio('Errore caricamento dati admin: ' + e.message, true, 'adminMsgBox');
+      }
+
+      renderListaChiusure();
+      renderListaAssenze();
+      popolaSelectDipendenti();
+
+      const todayBody = document.getElementById('adminTodayBody');
+      const monthBody = document.getElementById('adminMonthBody');
+      todayBody.innerHTML = `<tr><td colspan="7">Caricamento...</td></tr>`;
+      monthBody.innerHTML = `<tr><td colspan="5">Caricamento...</td></tr>`;
+
+      const dipendenti = cachedDipendenti.filter(d => !d.is_admin);
+      const { data: timbrature, error: errTim } = await client.from('timbrature').select('dipendente, email, tipo, data_lavoro, ora, created_at, lat, lng, in_trasferta, lavoro_serale_previsto').order('data_lavoro', { ascending: true }).order('ora', { ascending: true });
+      if (errTim) return mostraMessaggio('Errore caricamento timbrature: ' + errTim.message, true, 'adminMsgBox');
+
+      const oggi = isoDate(new Date());
+      const righeOggi = dipendenti.map(d => {
+        const todayRecords = timbrature.filter(t => t.email === d.email && t.data_lavoro === oggi);
+        const grouped = raggruppaTimbraturePerGiorno(todayRecords);
+        const recordGiorno = grouped[oggi] || { entrata: null, uscita: null };
+        const evalDay = evaluateDay(d.email, oggi, recordGiorno, Number(d.ore_giornaliere_previste || 0));
+        let stato = '<span class="badge wait">Non timbrato</span>';
+        if (evalDay.stato === 'straordinario') stato = '<span class="badge ok">Straordinario</span>';
+        if (evalDay.stato === 'lavorativo') stato = '<span class="badge ok">Chiuso</span>';
+        if (evalDay.stato === 'solo_entrata') stato = '<span class="badge warn">Solo entrata</span>';
+        if (evalDay.stato === 'serale_aperto') stato = '<span class="badge warn">Serale aperto</span>';
+        if (evalDay.stato === 'assenza_non_timbrata') stato = '<span class="badge warn">- ore previste</span>';
+        if (evalDay.stato === 'escluso') stato = '<span class="badge wait">Escluso</span>';
+        if (evalDay.stato === 'anomalia_assenza') stato = '<span class="badge warn">Anomalia</span>';
+        if (evalDay.uscitaEffettiva?.auto_generata) stato = '<span class="badge warn">Auto 16:30</span>';
+        return `<tr><td>${d.nome}</td><td>${recordGiorno.entrata ? formatOra(recordGiorno.entrata.ora || recordGiorno.entrata.created_at) : '--:--'}</td><td>${evalDay.uscitaEffettiva ? formatOra(evalDay.uscitaEffettiva.ora || evalDay.uscitaEffettiva.created_at) : '--:--'}</td><td>${formatOre(evalDay.ore)}</td><td>${formatOreSigned(evalDay.delta)}</td><td>${evalDay.trasferta ? '<span class="badge ok">Sì</span>' : '<span class="badge wait">No</span>'}</td><td>${stato}</td></tr>`;
+      });
+      todayBody.innerHTML = righeOggi.length ? righeOggi.join('') : `<tr><td colspan="7">Nessun dipendente attivo</td></tr>`;
+
+      const meseSelezionato = document.getElementById('adminMeseRiferimento').value;
+      const { startDate, endDate } = getDateRangeFromMonth(meseSelezionato);
+      const righeMese = dipendenti.map(d => {
+        const recordsMese = timbrature.filter(t => t.email === d.email && t.data_lavoro >= startDate && t.data_lavoro <= endDate);
+        const perGiorno = raggruppaTimbraturePerGiorno(recordsMese);
+        const orePreviste = Number(d.ore_giornaliere_previste || 0);
+        const saldoIniziale = Number(d.saldo_iniziale_ore || 0);
+        const employeeStart = getEmployeeStartDate(d.email);
+        let oreMese = 0, deltaMese = 0, trasferteMese = 0;
+        if (employeeStart) {
+          const loopStart = employeeStart > startDate ? employeeStart : startDate;
+          const today = isoDate(new Date());
+          const loopEnd = endDate < today ? endDate : today;
+          for (let x = new Date(loopStart + 'T12:00:00'); x <= new Date(loopEnd + 'T12:00:00'); x.setDate(x.getDate() + 1)) {
+            const giorno = isoDate(x);
+            const record = perGiorno[giorno] || { entrata: null, uscita: null };
+            const evalDay = evaluateDay(d.email, giorno, record, orePreviste);
+            deltaMese += evalDay.delta;
+            if (record.entrata && evalDay.uscitaEffettiva) {
+              oreMese += evalDay.ore;
+              if (evalDay.trasferta) trasferteMese += 1;
+            }
+          }
+        }
+
+        const allRecords = timbrature.filter(t => t.email === d.email);
+        const allDays = raggruppaTimbraturePerGiorno(allRecords);
+        let saldoStorico = saldoIniziale;
+        if (employeeStart) {
+          for (let x = new Date(employeeStart + 'T12:00:00'); x <= new Date(isoDate(new Date()) + 'T12:00:00'); x.setDate(x.getDate() + 1)) {
+            const giorno = isoDate(x);
+            const record = allDays[giorno] || { entrata: null, uscita: null };
+            saldoStorico += evaluateDay(d.email, giorno, record, orePreviste).delta;
+          }
+        }
+
+        return `<tr><td><button class="name-link" onclick="caricaDettaglio('${d.email.replace(/'/g, "\\'")}', '${d.nome.replace(/'/g, "\\'")}', ${Number(d.saldo_iniziale_ore || 0)})">${d.nome}</button></td><td>${formatOre(oreMese)}</td><td>${formatOreSigned(deltaMese)}</td><td>${trasferteMese}</td><td>${formatOreSigned(saldoStorico)}</td></tr>`;
+      });
+      monthBody.innerHTML = righeMese.length ? righeMese.join('') : `<tr><td colspan="5">Nessun dipendente attivo</td></tr>`;
+    }
+
+    function resetFormChiusura() {
+      document.getElementById('chiusuraEditId').value = '';
+      document.getElementById('chiusuraInizio').value = '';
+      document.getElementById('chiusuraFine').value = '';
+      document.getElementById('chiusuraNota').value = '';
+    }
+
+    function caricaChiusuraPerModifica(id) {
+      const row = cachedChiusure.find(c => c.id === id);
+      if (!row) return;
+      document.getElementById('chiusuraEditId').value = row.id;
+      document.getElementById('chiusuraInizio').value = row.data_inizio;
+      document.getElementById('chiusuraFine').value = row.data_fine;
+      document.getElementById('chiusuraNota').value = row.nota || '';
+      mostraMessaggio('Chiusura caricata in modifica.', false, 'adminMsgBox');
+    }
+
+    async function eliminaChiusura(id) {
+      const { error } = await client.from('chiusure_aziendali').delete().eq('id', id);
+      if (error) return mostraMessaggio('Errore eliminazione chiusura: ' + error.message, true, 'adminMsgBox');
+      resetFormChiusura();
+      mostraMessaggio('Chiusura eliminata.', false, 'adminMsgBox');
+      await caricaDashboardAdmin();
+    }
+
+    async function salvaChiusuraAziendale() {
+      const id = document.getElementById('chiusuraEditId').value;
+      const data_inizio = document.getElementById('chiusuraInizio').value;
+      const data_fine = document.getElementById('chiusuraFine').value;
+      const nota = document.getElementById('chiusuraNota').value.trim();
+      if (!data_inizio || !data_fine) return mostraMessaggio('Inserisci data inizio e fine chiusura.', true, 'adminMsgBox');
+      let error;
+      if (id) ({ error } = await client.from('chiusure_aziendali').update({ data_inizio, data_fine, nota }).eq('id', id));
+      else ({ error } = await client.from('chiusure_aziendali').insert([{ data_inizio, data_fine, nota }]));
+      if (error) return mostraMessaggio('Errore salvataggio chiusura: ' + error.message, true, 'adminMsgBox');
+      resetFormChiusura();
+      mostraMessaggio(id ? 'Chiusura aziendale aggiornata.' : 'Chiusura aziendale salvata.', false, 'adminMsgBox');
+      await caricaDashboardAdmin();
+    }
+
+    function resetFormAssenza() {
+      document.getElementById('assenzaEditId').value = '';
+      document.getElementById('assenzaInizio').value = '';
+      document.getElementById('assenzaFine').value = '';
+      document.getElementById('assenzaNota').value = '';
+      document.getElementById('assenzaTipo').value = 'ferie';
+    }
+
+    function caricaAssenzaPerModifica(id) {
+      const row = cachedAssenze.find(a => a.id === id);
+      if (!row) return;
+      document.getElementById('assenzaEditId').value = row.id;
+      document.getElementById('assenzaDipendente').value = row.email;
+      document.getElementById('assenzaInizio').value = row.data_inizio;
+      document.getElementById('assenzaFine').value = row.data_fine;
+      document.getElementById('assenzaTipo').value = row.tipo;
+      document.getElementById('assenzaNota').value = row.nota || '';
+      mostraMessaggio('Assenza caricata in modifica.', false, 'adminMsgBox');
+    }
+
+    async function eliminaAssenza(id) {
+      const { error } = await client.from('assenze_dipendenti').delete().eq('id', id);
+      if (error) return mostraMessaggio('Errore eliminazione assenza: ' + error.message, true, 'adminMsgBox');
+      resetFormAssenza();
+      mostraMessaggio('Assenza eliminata.', false, 'adminMsgBox');
+      await caricaDashboardAdmin();
+    }
+
+    async function salvaAssenzaDipendente() {
+      const id = document.getElementById('assenzaEditId').value;
+      const email = document.getElementById('assenzaDipendente').value;
+      const data_inizio = document.getElementById('assenzaInizio').value;
+      const data_fine = document.getElementById('assenzaFine').value;
+      const tipo = document.getElementById('assenzaTipo').value;
+      const nota = document.getElementById('assenzaNota').value.trim();
+      if (!email || !data_inizio || !data_fine || !tipo) return mostraMessaggio('Compila tutti i campi assenza.', true, 'adminMsgBox');
+      let error;
+      if (id) ({ error } = await client.from('assenze_dipendenti').update({ email, data_inizio, data_fine, tipo, nota }).eq('id', id));
+      else ({ error } = await client.from('assenze_dipendenti').insert([{ email, data_inizio, data_fine, tipo, nota }]));
+      if (error) return mostraMessaggio('Errore salvataggio assenza: ' + error.message, true, 'adminMsgBox');
+      resetFormAssenza();
+      mostraMessaggio(id ? 'Assenza dipendente aggiornata.' : 'Assenza dipendente salvata.', false, 'adminMsgBox');
+      await caricaDashboardAdmin();
+    }
+
+    async function caricaDettaglio(email, nome = '', saldoIniziale = 0) {
+      selectedDetailEmail = email;
+      selectedDetailNome = nome || email;
+      document.getElementById('saldoInizialeAdminInput').value = Number(saldoIniziale || 0).toFixed(2);
+      document.getElementById('dettaglioDipendenteTitolo').textContent = `Dettaglio di ${selectedDetailNome}`;
+      const dettaglioBox = document.getElementById('dettaglioBox');
+      dettaglioBox.innerHTML = 'Caricamento...';
+      const meseSelezionato = document.getElementById('adminMeseRiferimento').value;
+      const { startDate, endDate } = getDateRangeFromMonth(meseSelezionato);
+      const { data, error } = await client.from('timbrature').select('*').eq('email', email).gte('data_lavoro', startDate).lte('data_lavoro', endDate).order('data_lavoro', { ascending: true }).order('ora', { ascending: true });
+      if (error) return dettaglioBox.innerHTML = '<div class="detail-empty">Errore caricamento dettaglio</div>';
+      const perGiorno = raggruppaTimbraturePerGiorno(data || []);
+      const dip = cachedDipendenti.find(d => d.email === email);
+      const orePreviste = Number(dip?.ore_giornaliere_previste || 0);
+      const employeeStart = getEmployeeStartDate(email);
+      let html = `<div class="detail-table-wrap"><table><thead><tr><th>Data</th><th>Entrata</th><th>Uscita</th><th>Ore</th><th>Delta</th><th>Trasferta</th><th>Note</th><th>Azioni</th></tr></thead><tbody>`;
+      if (employeeStart) {
+        const loopStart = employeeStart > startDate ? employeeStart : startDate;
+        for (let x = new Date(loopStart + 'T12:00:00'); x <= new Date(endDate + 'T12:00:00'); x.setDate(x.getDate() + 1)) {
+          const giorno = isoDate(x);
+          const record = perGiorno[giorno] || { entrata: null, uscita: null };
+          const evalDay = evaluateDay(email, giorno, record, orePreviste);
+          html += `<tr><td>${giorno}</td><td>${record.entrata ? formatOra(record.entrata.ora || record.entrata.created_at) : '--:--'}</td><td>${evalDay.uscitaEffettiva ? formatOra(evalDay.uscitaEffettiva.ora || evalDay.uscitaEffettiva.created_at) : '--:--'}</td><td>${evalDay.ore.toFixed(2)}</td><td>${formatOreSigned(evalDay.delta)}</td><td>${evalDay.trasferta ? 'SI' : 'NO'}</td><td>${evalDay.note.length ? evalDay.note.join(', ') : '-'}</td><td><button class="btn-secondary" style="width:auto; min-width:120px; margin:0;" onclick="apriEditorTimbraturaAdmin('${email.replace(/'/g, "\'")}', '${selectedDetailNome.replace(/'/g, "\'")}', '${giorno}', '${record.entrata ? formatOra(record.entrata.ora || record.entrata.created_at) : ''}', '${evalDay.uscitaEffettiva ? formatOra(evalDay.uscitaEffettiva.ora || evalDay.uscitaEffettiva.created_at) : ''}', ${evalDay.trasferta ? 'true' : 'false'})">Modifica</button></td></tr>`;
+        }
+      }
+      html += '</tbody></table></div>';
+      dettaglioBox.innerHTML = html;
+    }
+
+    function timeValueFromText(t) {
+      if (!t || t === '--:--') return '';
+      return t.slice(0, 5);
+    }
+
+    function localIsoFromDateTime(dateStr, timeStr) {
+      const d = new Date(dateStr + 'T' + timeStr + ':00');
+      return d.toISOString();
+    }
+
+    function apriEditorTimbraturaAdmin(email, nome, giorno, entrata, uscita, trasferta) {
+      selectedDetailEmail = email;
+      selectedDetailNome = nome || email;
+      document.getElementById('editTimbraturaEmail').value = email;
+      document.getElementById('editTimbraturaNome').value = nome || email;
+      document.getElementById('editTimbraturaData').value = giorno;
+      document.getElementById('editOraEntrata').value = timeValueFromText(entrata);
+      document.getElementById('editOraUscita').value = timeValueFromText(uscita);
+      document.getElementById('editTrasferta').checked = !!trasferta;
+      document.getElementById('adminEditTimbraturaBox').classList.remove('hidden');
+      mostraMessaggio('Giornata caricata in modifica.', false, 'adminMsgBox');
+    }
+
+    function chiudiEditorTimbraturaAdmin() {
+      document.getElementById('adminEditTimbraturaBox').classList.add('hidden');
+    }
+
+    async function eliminaGiornataAdmin() {
+      const email = document.getElementById('editTimbraturaEmail').value;
+      const giorno = document.getElementById('editTimbraturaData').value;
+      if (!email || !giorno) return mostraMessaggio('Seleziona prima una giornata da modificare.', true, 'adminMsgBox');
+      const ok = confirm('Vuoi eliminare tutte le timbrature di questa giornata?');
+      if (!ok) return;
+      const { error } = await client.from('timbrature').delete().eq('email', email).eq('data_lavoro', giorno);
+      if (error) return mostraMessaggio('Errore eliminazione timbrature: ' + error.message, true, 'adminMsgBox');
+      mostraMessaggio('Giornata eliminata.', false, 'adminMsgBox');
+      chiudiEditorTimbraturaAdmin();
+      await caricaDashboardAdmin();
+      await caricaDettaglio(email, document.getElementById('editTimbraturaNome').value, Number(document.getElementById('saldoInizialeAdminInput').value || 0));
+    }
+
+    async function salvaTimbraturaAdmin() {
+      const email = document.getElementById('editTimbraturaEmail').value;
+      const nome = document.getElementById('editTimbraturaNome').value || email;
+      const giorno = document.getElementById('editTimbraturaData').value;
+      const oraEntrata = document.getElementById('editOraEntrata').value;
+      const oraUscita = document.getElementById('editOraUscita').value;
+      const trasferta = document.getElementById('editTrasferta').checked;
+
+      if (!email || !giorno) {
+        return mostraMessaggio('Seleziona prima una giornata da modificare.', true, 'adminMsgBox');
+      }
+      if (!oraEntrata && !oraUscita) {
+        return mostraMessaggio('Inserisci almeno entrata o uscita.', true, 'adminMsgBox');
+      }
+
+      const { error: deleteError } = await client
+        .from('timbrature')
+        .delete()
+        .eq('email', email)
+        .eq('data_lavoro', giorno);
+
+      if (deleteError) {
+        return mostraMessaggio('Errore eliminazione vecchie timbrature: ' + deleteError.message, true, 'adminMsgBox');
+      }
+
+      const nuoveTimbrature = [];
+
+      if (oraEntrata) {
+        nuoveTimbrature.push({
+          dipendente: nome,
+          email,
+          tipo: 'entrata',
+          data_lavoro: giorno,
+          ora: localIsoFromDateTime(giorno, oraEntrata),
+          in_trasferta: false,
+          lavoro_serale_previsto: false
+        });
+      }
+
+      if (oraUscita) {
+        nuoveTimbrature.push({
+          dipendente: nome,
+          email,
+          tipo: 'uscita',
+          data_lavoro: giorno,
+          ora: localIsoFromDateTime(giorno, oraUscita),
+          in_trasferta: trasferta,
+          lavoro_serale_previsto: false
+        });
+      }
+
+      const { error: insertError } = await client
+        .from('timbrature')
+        .insert(nuoveTimbrature);
+
+      if (insertError) {
+        return mostraMessaggio('Errore salvataggio nuove timbrature: ' + insertError.message, true, 'adminMsgBox');
+      }
+
+      mostraMessaggio('Timbrature aggiornate correttamente.', false, 'adminMsgBox');
+      await loadAdminMeta();
+      await caricaDashboardAdmin();
+      await caricaDettaglio(email, nome, Number(document.getElementById('saldoInizialeAdminInput').value || 0));
+    }
+
+    async function salvaSaldoInizialeAdmin() {
+      if (!selectedDetailEmail) return mostraMessaggio('Seleziona prima un dipendente.', true, 'adminMsgBox');
+      const value = Number(document.getElementById('saldoInizialeAdminInput').value || 0);
+      const { error } = await client.from('dipendenti').update({ saldo_iniziale_ore: value }).eq('email', selectedDetailEmail);
+      if (error) return mostraMessaggio('Errore salvataggio saldo iniziale: ' + error.message, true, 'adminMsgBox');
+      mostraMessaggio(`Saldo iniziale aggiornato per ${selectedDetailNome}.`, false, 'adminMsgBox');
+      await caricaDashboardAdmin();
+      await caricaDettaglio(selectedDetailEmail, selectedDetailNome, value);
+    }
+
+    async function exportCSV() {
+      const meseSelezionato = document.getElementById('adminMeseRiferimento').value;
+      if (!meseSelezionato) return mostraMessaggio('Seleziona un mese.', true, 'adminMsgBox');
+      await loadAdminMeta();
+      const { startDate, endDate } = getDateRangeFromMonth(meseSelezionato);
+      const dipendenti = cachedDipendenti.filter(d => !d.is_admin);
+      const { data, error } = await client.from('timbrature').select('dipendente, email, tipo, data_lavoro, ora, created_at, lat, lng, in_trasferta, lavoro_serale_previsto').gte('data_lavoro', startDate).lte('data_lavoro', endDate).order('data_lavoro', { ascending: true }).order('ora', { ascending: true });
+      if (error) return mostraMessaggio('Errore export: ' + error.message, true, 'adminMsgBox');
+      let csv = 'Dipendente,Data,Entrata,Uscita,Ore,Delta,Trasferta,Note\n';
+      dipendenti.forEach(d => {
+        const perGiorno = raggruppaTimbraturePerGiorno((data || []).filter(r => r.email === d.email));
+        const employeeStart = getEmployeeStartDate(d.email);
+        if (!employeeStart) return;
+        const loopStart = employeeStart > startDate ? employeeStart : startDate;
+        for (let x = new Date(loopStart + 'T12:00:00'); x <= new Date(endDate + 'T12:00:00'); x.setDate(x.getDate() + 1)) {
+          const giorno = isoDate(x);
+          const evalDay = evaluateDay(d.email, giorno, perGiorno[giorno] || { entrata: null, uscita: null }, Number(d.ore_giornaliere_previste || 0));
+          csv += [`"${d.nome}"`, giorno, perGiorno[giorno]?.entrata ? formatOra(perGiorno[giorno].entrata.ora || perGiorno[giorno].entrata.created_at) : '--:--', evalDay.uscitaEffettiva ? formatOra(evalDay.uscitaEffettiva.ora || evalDay.uscitaEffettiva.created_at) : '--:--', evalDay.ore.toFixed(2), evalDay.delta.toFixed(2), evalDay.trasferta ? 'SI' : 'NO', `"${(evalDay.note.join(', ') || '-')}"`].join(',') + '\n';
+        }
+      });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `timbrature_${meseSelezionato}.csv`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a); window.URL.revokeObjectURL(url);
+      mostraMessaggio('Export completato.', false, 'adminMsgBox');
+    }
+
+    async function cambiaPassword() {
+      const newPassword = document.getElementById('newPassword').value || '';
+      const confirmPassword = document.getElementById('confirmPassword').value || '';
+      if (!newPassword || !confirmPassword) return mostraMessaggio('Inserisci e conferma la nuova password.', true, 'appMsgBox');
+      if (newPassword !== confirmPassword) return mostraMessaggio('Le password non coincidono.', true, 'appMsgBox');
+      if (newPassword.length < 6) return mostraMessaggio('La password deve avere almeno 6 caratteri.', true, 'appMsgBox');
+      const { error } = await client.auth.updateUser({ password: newPassword });
+      if (error) return mostraMessaggio('Errore cambio password: ' + error.message, true, 'appMsgBox');
+      document.getElementById('newPassword').value = '';
+      document.getElementById('confirmPassword').value = '';
+      mostraMessaggio('Password aggiornata correttamente.', false, 'appMsgBox');
+    }
+
+    async function cambiaPasswordAdmin() {
+      const newPassword = document.getElementById('newPasswordAdmin').value || '';
+      const confirmPassword = document.getElementById('confirmPasswordAdmin').value || '';
+      if (!newPassword || !confirmPassword) return mostraMessaggio('Inserisci e conferma la nuova password.', true, 'adminMsgBox');
+      if (newPassword !== confirmPassword) return mostraMessaggio('Le password non coincidono.', true, 'adminMsgBox');
+      if (newPassword.length < 6) return mostraMessaggio('La password deve avere almeno 6 caratteri.', true, 'adminMsgBox');
+      const { error } = await client.auth.updateUser({ password: newPassword });
+      if (error) return mostraMessaggio('Errore cambio password: ' + error.message, true, 'adminMsgBox');
+      document.getElementById('newPasswordAdmin').value = '';
+      document.getElementById('confirmPasswordAdmin').value = '';
+      mostraMessaggio('Password aggiornata correttamente.', false, 'adminMsgBox');
+    }
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+
+    client.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        mostraResetPassword();
+      }
+    });
+
+    aggiornaDataOggi();
+    impostaMeseCorrente();
+    controllaSessione();
+  </script>
+</body>
+</html>
