@@ -213,6 +213,8 @@
           </div>
           <div class="msg" id="appMsgBox"></div>
         </div>
+        <button class="btn-secondary" onclick="tornaHub()" style="margin-bottom:12px;">Torna al HUB</button>
+        <button class="btn-secondary" onclick="tornaHub()" style="margin-bottom:12px;">Torna al HUB</button>
         <button class="btn-logout" onclick="logout()">Logout</button>
       </div>
 
@@ -327,6 +329,7 @@
     const SEDE_LAT = 45.6501;
     const SEDE_LNG = 9.2187;
     const SOGLIA_TRASFERTA_KM = 50;
+    const HUB_URL = "https://biemmehub.vercel.app/";
     const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: {
         persistSession: true,
@@ -1430,6 +1433,34 @@
       mostraMessaggio('Password aggiornata correttamente.', false, 'adminMsgBox');
     }
 
+
+    async function riceviSessioneDaHub() {
+      if (!window.location.hash || !window.location.hash.includes('access_token=')) return false;
+
+      const params = new URLSearchParams(window.location.hash.substring(1));
+      const access_token = params.get('access_token');
+      const refresh_token = params.get('refresh_token');
+
+      if (!access_token || !refresh_token) return false;
+
+      const { error } = await client.auth.setSession({
+        access_token,
+        refresh_token
+      });
+
+      if (error) {
+        console.error('Errore ricezione sessione HUB:', error);
+        return false;
+      }
+
+      history.replaceState(null, document.title, window.location.pathname + window.location.search);
+      return true;
+    }
+
+    function tornaHub() {
+      window.location.href = HUB_URL;
+    }
+
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').catch(() => {});
@@ -1444,7 +1475,11 @@
 
     aggiornaDataOggi();
     impostaMeseCorrente();
-    controllaSessione();
+
+    (async () => {
+      await riceviSessioneDaHub();
+      await controllaSessione();
+    })();
   </script>
 </body>
 </html>
