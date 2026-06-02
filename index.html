@@ -805,7 +805,7 @@
       userPill.textContent = currentDipendente.nome + ' - ' + currentDipendente.email;
       userPill.classList.remove('hidden');
 
-      if (dipendente.is_admin) {
+      if (currentDipendente.is_admin) {
         document.getElementById('employeeSection').classList.add('hidden');
         document.getElementById('adminSection').classList.remove('hidden');
         await caricaDashboardAdmin();
@@ -1312,7 +1312,7 @@
     }
 
     async function salvaSaldoInizialeAdmin() {
-      if (!selectedDetailEmail) return mostraMessaggio('Seleziona prima un dipendente.', true, 'adminMsgBox');
+      if (!selectedDetailEmail) return mostraMessaggio('Seleziona prima un currentDipendente.', true, 'adminMsgBox');
       const value = Number(document.getElementById('saldoInizialeAdminInput').value || 0);
       const { error } = await client.from('utenti').update({ saldo_iniziale_ore: value }).eq('email', selectedDetailEmail);
       if (error) return mostraMessaggio('Errore salvataggio saldo iniziale: ' + error.message, true, 'adminMsgBox');
