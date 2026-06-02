@@ -802,7 +802,7 @@
       currentDipendente = normalizzaUtente(dipendenteRaw);
       document.getElementById('loginSection').classList.add('hidden');
       const userPill = document.getElementById('userPill');
-      userPill.textContent = dipendente.nome + ' - ' + dipendente.email;
+      userPill.textContent = currentDipendente.nome + ' - ' + currentDipendente.email;
       userPill.classList.remove('hidden');
 
       if (dipendente.is_admin) {
