@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BIEMMEAPP</title>
+  <title>BIEMME TIMBRATURE</title>
   <meta name="theme-color" content="#002e52" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -129,7 +129,7 @@
       </div>
 
       <div class="card" id="loginSection">
-        <h1 class="login-title">BIEMMEAPP</h1>
+        <h1 class="login-title">BIEMME TIMBRATURE</h1>
         <div class="login-subtitle">Accedi con la tua email registrata</div>
         <input type="email" id="email" placeholder="Email" />
         <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px;">
@@ -322,8 +322,8 @@
   </div>
 
   <script>
-    const SUPABASE_URL = "https://vdxmodaowhihureuuojx.supabase.co";
-    const SUPABASE_ANON_KEY = "sb_publishable_fzXu9VR2_PhbhnBJWHVviQ_6S5tL1d-";
+    const SUPABASE_URL = "https://ehrmyyjojlgrdgxjsuzu.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_5GARNlBShnQXlLnQy-kCnA_JhlcIcr3";
     const SEDE_LAT = 45.6501;
     const SEDE_LNG = 9.2187;
     const SOGLIA_TRASFERTA_KM = 50;
@@ -344,6 +344,25 @@
     let cachedChiusure = [];
     let cachedAssenze = [];
     let cachedStartDates = {};
+
+    function normalizzaUtente(u) {
+      return {
+        id: u.id,
+        nome: u.nome,
+        email: u.email,
+        ruolo: u.ruolo || 'tecnico',
+        is_admin: (u.ruolo || '').toLowerCase() === 'admin',
+        attivo: u.attivo !== false,
+        ore_giornaliere_previste: Number(u.ore_giornaliere_previste || 8),
+        saldo_iniziale_ore: Number(u.saldo_iniziale_ore || 0)
+      };
+    }
+
+    function getUtenteIdByEmail(email) {
+      const u = cachedDipendenti.find(d => d.email === email);
+      return u?.id || null;
+    }
+
 
     const pad = (n) => String(n).padStart(2, '0');
     const isoDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -615,7 +634,7 @@
 
     async function loadAdminMeta() {
       const [dipRes, chiRes, assRes, startRes] = await Promise.all([
-        client.from('dipendenti').select('nome, email, ore_giornaliere_previste, saldo_iniziale_ore, is_admin, attivo').eq('attivo', true).order('nome', { ascending: true }),
+        client.from('utenti').select('id, nome, email, ruolo, ore_giornaliere_previste, saldo_iniziale_ore, attivo').eq('attivo', true).order('nome', { ascending: true }),
         client.from('chiusure_aziendali').select('*').order('data_inizio', { ascending: true }),
         client.from('assenze_dipendenti').select('*').order('data_inizio', { ascending: true }),
         client.from('timbrature').select('email, data_lavoro').order('data_lavoro', { ascending: true })
@@ -624,7 +643,7 @@
       if (chiRes.error) throw chiRes.error;
       if (assRes.error) throw assRes.error;
       if (startRes.error) throw startRes.error;
-      cachedDipendenti = dipRes.data || [];
+      cachedDipendenti = (dipRes.data || []).map(normalizzaUtente);
       cachedChiusure = chiRes.data || [];
       cachedAssenze = assRes.data || [];
       cachedStartDates = {};
@@ -764,17 +783,23 @@
       }
 
       currentUser = user;
-      const { data: dipendente, error } = await client.from('dipendenti').select('id, nome, email, attivo, is_admin, ore_giornaliere_previste, saldo_iniziale_ore').eq('email', user.email).eq('attivo', true).single();
-      if (error || !dipendente) {
+      const { data: dipendenteRaw, error } = await client
+        .from('utenti')
+        .select('id, nome, email, ruolo, attivo, ore_giornaliere_previste, saldo_iniziale_ore')
+        .eq('email', user.email)
+        .eq('attivo', true)
+        .single();
+
+      if (error || !dipendenteRaw) {
         document.getElementById('loginSection').classList.remove('hidden');
         document.getElementById('employeeSection').classList.add('hidden');
         document.getElementById('adminSection').classList.add('hidden');
         document.getElementById('userPill').classList.add('hidden');
-        mostraMessaggio('Utente autenticato ma non presente nella tabella dipendenti.', true, 'msgBox');
+        mostraMessaggio('Utente autenticato ma non presente nella tabella utenti.', true, 'msgBox');
         return;
       }
 
-      currentDipendente = dipendente;
+      currentDipendente = normalizzaUtente(dipendenteRaw);
       document.getElementById('loginSection').classList.add('hidden');
       const userPill = document.getElementById('userPill');
       userPill.textContent = dipendente.nome + ' - ' + dipendente.email;
@@ -969,7 +994,7 @@
         inTrasferta = haversineKm(posizione.lat, posizione.lng, SEDE_LAT, SEDE_LNG) > SOGLIA_TRASFERTA_KM;
       }
 
-      const payload = { dipendente: currentDipendente.nome, email: currentUser.email, tipo, data_lavoro: targetDataLavoro, lat: posizione.lat, lng: posizione.lng, indirizzo: posizione.indirizzo, in_trasferta: inTrasferta };
+      const payload = { user_id: currentDipendente.id, nome: currentDipendente.nome, email: currentUser.email, tipo, data_lavoro: targetDataLavoro, lat: posizione.lat, lng: posizione.lng, in_trasferta: inTrasferta };
       if (tipo === 'entrata') payload.lavoro_serale_previsto = lavoroSeralePrevisto;
       const { error } = await client.from('timbrature').insert([payload]);
       if (error) return mostraMessaggio('Errore salvataggio: ' + error.message, true, 'appMsgBox');
@@ -1001,7 +1026,7 @@
       monthBody.innerHTML = `<tr><td colspan="5">Caricamento...</td></tr>`;
 
       const dipendenti = cachedDipendenti.filter(d => !d.is_admin);
-      const { data: timbrature, error: errTim } = await client.from('timbrature').select('dipendente, email, tipo, data_lavoro, ora, created_at, lat, lng, in_trasferta, lavoro_serale_previsto').order('data_lavoro', { ascending: true }).order('ora', { ascending: true });
+      const { data: timbrature, error: errTim } = await client.from('timbrature').select('nome, email, tipo, data_lavoro, ora, created_at, lat, lng, in_trasferta, lavoro_serale_previsto').order('data_lavoro', { ascending: true }).order('ora', { ascending: true });
       if (errTim) return mostraMessaggio('Errore caricamento timbrature: ' + errTim.message, true, 'adminMsgBox');
 
       const oggi = isoDate(new Date());
@@ -1141,8 +1166,8 @@
       const nota = document.getElementById('assenzaNota').value.trim();
       if (!email || !data_inizio || !data_fine || !tipo) return mostraMessaggio('Compila tutti i campi assenza.', true, 'adminMsgBox');
       let error;
-      if (id) ({ error } = await client.from('assenze_dipendenti').update({ email, data_inizio, data_fine, tipo, nota }).eq('id', id));
-      else ({ error } = await client.from('assenze_dipendenti').insert([{ email, data_inizio, data_fine, tipo, nota }]));
+      if (id) ({ error } = await client.from('assenze_dipendenti').update({ user_id: getUtenteIdByEmail(email), email, nome: (cachedDipendenti.find(d => d.email === email)?.nome || email), data_inizio, data_fine, tipo, nota }).eq('id', id));
+      else ({ error } = await client.from('assenze_dipendenti').insert([{ user_id: getUtenteIdByEmail(email), email, nome: (cachedDipendenti.find(d => d.email === email)?.nome || email), data_inizio, data_fine, tipo, nota }]));
       if (error) return mostraMessaggio('Errore salvataggio assenza: ' + error.message, true, 'adminMsgBox');
       resetFormAssenza();
       mostraMessaggio(id ? 'Assenza dipendente aggiornata.' : 'Assenza dipendente salvata.', false, 'adminMsgBox');
@@ -1248,7 +1273,8 @@
 
       if (oraEntrata) {
         nuoveTimbrature.push({
-          dipendente: nome,
+          user_id: getUtenteIdByEmail(email),
+          nome,
           email,
           tipo: 'entrata',
           data_lavoro: giorno,
@@ -1260,7 +1286,8 @@
 
       if (oraUscita) {
         nuoveTimbrature.push({
-          dipendente: nome,
+          user_id: getUtenteIdByEmail(email),
+          nome,
           email,
           tipo: 'uscita',
           data_lavoro: giorno,
@@ -1287,7 +1314,7 @@
     async function salvaSaldoInizialeAdmin() {
       if (!selectedDetailEmail) return mostraMessaggio('Seleziona prima un dipendente.', true, 'adminMsgBox');
       const value = Number(document.getElementById('saldoInizialeAdminInput').value || 0);
-      const { error } = await client.from('dipendenti').update({ saldo_iniziale_ore: value }).eq('email', selectedDetailEmail);
+      const { error } = await client.from('utenti').update({ saldo_iniziale_ore: value }).eq('email', selectedDetailEmail);
       if (error) return mostraMessaggio('Errore salvataggio saldo iniziale: ' + error.message, true, 'adminMsgBox');
       mostraMessaggio(`Saldo iniziale aggiornato per ${selectedDetailNome}.`, false, 'adminMsgBox');
       await caricaDashboardAdmin();
@@ -1300,7 +1327,7 @@
       await loadAdminMeta();
       const { startDate, endDate } = getDateRangeFromMonth(meseSelezionato);
       const dipendenti = cachedDipendenti.filter(d => !d.is_admin);
-      const { data, error } = await client.from('timbrature').select('dipendente, email, tipo, data_lavoro, ora, created_at, lat, lng, in_trasferta, lavoro_serale_previsto').gte('data_lavoro', startDate).lte('data_lavoro', endDate).order('data_lavoro', { ascending: true }).order('ora', { ascending: true });
+      const { data, error } = await client.from('timbrature').select('nome, email, tipo, data_lavoro, ora, created_at, lat, lng, in_trasferta, lavoro_serale_previsto').gte('data_lavoro', startDate).lte('data_lavoro', endDate).order('data_lavoro', { ascending: true }).order('ora', { ascending: true });
       if (error) return mostraMessaggio('Errore export: ' + error.message, true, 'adminMsgBox');
       let csv = 'Dipendente,Data,Entrata,Uscita,Ore,Delta,Trasferta,Note\n';
       dipendenti.forEach(d => {
