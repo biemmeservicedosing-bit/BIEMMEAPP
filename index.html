@@ -214,7 +214,6 @@
           <div class="msg" id="appMsgBox"></div>
         </div>
         <button class="btn-secondary" onclick="tornaHub()" style="margin-bottom:12px;">Torna al HUB</button>
-        <button class="btn-secondary" onclick="tornaHub()" style="margin-bottom:12px;">Torna al HUB</button>
         <button class="btn-logout" onclick="logout()">Logout</button>
       </div>
 
@@ -329,7 +328,7 @@
     const SEDE_LAT = 45.6501;
     const SEDE_LNG = 9.2187;
     const SOGLIA_TRASFERTA_KM = 50;
-    const HUB_URL = "https://biemmehub.vercel.app/";
+    const HUB_URL = "https://biemme-hub.vercel.app/";
     const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: {
         persistSession: true,
