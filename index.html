@@ -880,43 +880,54 @@
     }
 
 
-    async function calcolaSaldoTotaleStorico() {
-      if (!currentUser || !currentDipendente) return;
+    async function calcolaSaldoTotaleStorico(email = null, dipendente = null) {
+      const targetEmail = email || currentUser?.email;
+      const targetDip = dipendente || currentDipendente;
 
-      const orePreviste = Number(currentDipendente.ore_giornaliere_previste || 0);
-      const saldoIniziale = Number(currentDipendente.saldo_iniziale_ore || 0);
+      if (!targetEmail || !targetDip) return 0;
+
+      const orePreviste = Number(targetDip.ore_giornaliere_previste || 8);
+      const saldoIniziale = Number(targetDip.saldo_iniziale_ore || 0);
 
       const { data, error } = await client
         .from('timbrature')
         .select('tipo, data_lavoro, ora, created_at, lat, lng, in_trasferta, lavoro_serale_previsto')
-        .eq('email', currentUser.email)
+        .eq('email', targetEmail)
         .order('data_lavoro', { ascending: true })
         .order('ora', { ascending: true });
 
       if (error) {
-        return mostraMessaggio('Errore calcolo saldo storico: ' + error.message, true, 'appMsgBox');
+        mostraMessaggio('Errore calcolo saldo storico: ' + error.message, true, currentDipendente?.is_admin ? 'adminMsgBox' : 'appMsgBox');
+        return saldoIniziale;
       }
 
-      const perGiorno = raggruppaTimbraturePerGiorno(data || []);
-      const employeeStart = getEmployeeStartDate(currentUser.email);
+      const records = data || [];
 
-      if (!employeeStart) {
-        await calcolaSaldoTotaleStorico();
-        return;
+      if (!records.length) {
+        if (!email) aggiornaValore('saldoTotale', saldoIniziale, true);
+        return saldoIniziale;
       }
 
+      const perGiorno = raggruppaTimbraturePerGiorno(records);
+      const employeeStart = records[0].data_lavoro;
       const today = isoDate(new Date());
+
       let saldoStorico = saldoIniziale;
 
       for (let d = new Date(employeeStart + 'T12:00:00'); d <= new Date(today + 'T12:00:00'); d.setDate(d.getDate() + 1)) {
         const giorno = isoDate(d);
         const record = perGiorno[giorno] || { entrata: null, uscita: null };
-        const evalDay = evaluateDay(currentUser.email, giorno, record, orePreviste);
+        const evalDay = evaluateDay(targetEmail, giorno, record, orePreviste);
         saldoStorico += evalDay.delta;
       }
 
-      aggiornaValore('saldoTotale', saldoStorico, true);
+      if (!email) {
+        aggiornaValore('saldoTotale', saldoStorico, true);
+      }
+
+      return saldoStorico;
     }
+
 
     async function calcolaRiepilogoOre() {
       const orePreviste = Number(currentDipendente.ore_giornaliere_previste || 0);
@@ -953,7 +964,8 @@
       const perGiorno = raggruppaTimbraturePerGiorno(data);
       const employeeStart = getEmployeeStartDate(currentUser.email);
       let oreMese = 0, deltaMese = 0, giorniLavorati = 0, trasferteMese = 0;
-      if (!employeeStart) {
+      const employeeStartReal = employeeStart || (data && data.length ? data[0].data_lavoro : null);
+      if (!employeeStartReal) {
         aggiornaValore('oreMese', 0);
         aggiornaValore('deltaMese', 0, true);
         await calcolaSaldoTotaleStorico();
@@ -961,7 +973,7 @@
         document.getElementById('trasferteMese').textContent = '0';
         return;
       }
-      const loopStart = employeeStart > startDate ? employeeStart : startDate;
+      const loopStart = employeeStartReal > startDate ? employeeStartReal : startDate;
       const today = isoDate(new Date());
       const loopEnd = endDate < today ? endDate : today;
       for (let d = new Date(loopStart + 'T12:00:00'); d <= new Date(loopEnd + 'T12:00:00'); d.setDate(d.getDate() + 1)) {
@@ -1089,22 +1101,24 @@
 
       const meseSelezionato = document.getElementById('adminMeseRiferimento').value;
       const { startDate, endDate } = getDateRangeFromMonth(meseSelezionato);
-      const righeMese = dipendenti.map(d => {
+      const righeMese = await Promise.all(dipendenti.map(async d => {
         const recordsMese = timbrature.filter(t => t.email === d.email && t.data_lavoro >= startDate && t.data_lavoro <= endDate);
         const perGiorno = raggruppaTimbraturePerGiorno(recordsMese);
         const orePreviste = Number(d.ore_giornaliere_previste || 0);
-        const saldoIniziale = Number(d.saldo_iniziale_ore || 0);
         const employeeStart = getEmployeeStartDate(d.email);
         let oreMese = 0, deltaMese = 0, trasferteMese = 0;
+
         if (employeeStart) {
           const loopStart = employeeStart > startDate ? employeeStart : startDate;
           const today = isoDate(new Date());
           const loopEnd = endDate < today ? endDate : today;
+
           for (let x = new Date(loopStart + 'T12:00:00'); x <= new Date(loopEnd + 'T12:00:00'); x.setDate(x.getDate() + 1)) {
             const giorno = isoDate(x);
             const record = perGiorno[giorno] || { entrata: null, uscita: null };
             const evalDay = evaluateDay(d.email, giorno, record, orePreviste);
             deltaMese += evalDay.delta;
+
             if (record.entrata && evalDay.uscitaEffettiva) {
               oreMese += evalDay.ore;
               if (evalDay.trasferta) trasferteMese += 1;
@@ -1112,19 +1126,11 @@
           }
         }
 
-        const allRecords = timbrature.filter(t => t.email === d.email);
-        const allDays = raggruppaTimbraturePerGiorno(allRecords);
-        let saldoStorico = saldoIniziale;
-        if (employeeStart) {
-          for (let x = new Date(employeeStart + 'T12:00:00'); x <= new Date(isoDate(new Date()) + 'T12:00:00'); x.setDate(x.getDate() + 1)) {
-            const giorno = isoDate(x);
-            const record = allDays[giorno] || { entrata: null, uscita: null };
-            saldoStorico += evaluateDay(d.email, giorno, record, orePreviste).delta;
-          }
-        }
+        const saldoStorico = await calcolaSaldoTotaleStorico(d.email, d);
 
         return `<tr><td><button class="name-link" onclick="caricaDettaglio('${d.email.replace(/'/g, "\\'")}', '${d.nome.replace(/'/g, "\\'")}', ${Number(d.saldo_iniziale_ore || 0)})">${d.nome}</button></td><td>${formatOre(oreMese)}</td><td>${formatOreSigned(deltaMese)}</td><td>${trasferteMese}</td><td>${formatOreSigned(saldoStorico)}</td></tr>`;
-      });
+      }));
+
       monthBody.innerHTML = righeMese.length ? righeMese.join('') : `<tr><td colspan="5">Nessun dipendente attivo</td></tr>`;
     }
 
@@ -1355,6 +1361,16 @@
       const value = Number(document.getElementById('saldoInizialeAdminInput').value || 0);
       const { error } = await client.from('utenti').update({ saldo_iniziale_ore: value }).eq('email', selectedDetailEmail);
       if (error) return mostraMessaggio('Errore salvataggio saldo iniziale: ' + error.message, true, 'adminMsgBox');
+
+      cachedDipendenti = cachedDipendenti.map(d =>
+        d.email === selectedDetailEmail ? { ...d, saldo_iniziale_ore: value } : d
+      );
+
+      if (currentDipendente && currentDipendente.email === selectedDetailEmail) {
+        currentDipendente.saldo_iniziale_ore = value;
+        await calcolaSaldoTotaleStorico();
+      }
+
       mostraMessaggio(`Saldo iniziale aggiornato per ${selectedDetailNome}.`, false, 'adminMsgBox');
       await caricaDashboardAdmin();
       await caricaDettaglio(selectedDetailEmail, selectedDetailNome, value);
