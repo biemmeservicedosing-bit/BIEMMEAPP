@@ -346,6 +346,8 @@
     let cachedChiusure = [];
     let cachedAssenze = [];
     let cachedStartDates = {};
+    let adminDayEditCache = {};
+    let timbraturaAdminCorrente = null;
 
     function normalizzaUtente(u) {
       return {
@@ -376,9 +378,31 @@
     function formatDataIt(date) { return new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }).format(date); }
     function formatGiornoIt(date) { return new Intl.DateTimeFormat('it-IT', { weekday: 'long' }).format(date); }
     function formatDataBreve(timestamp) { return new Date(timestamp).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
-    function formatOra(timestamp) { return new Date(timestamp).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }); }
+    function formatOra(timestamp) {
+      if (!timestamp) return '--:--';
+      const d = new Date(timestamp);
+      if (Number.isNaN(d.getTime())) return '--:--';
+      return d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    }
     function formatOre(value) { return Number(value || 0).toFixed(2) + ' h'; }
     function formatOreSigned(value) { const n = Number(value || 0); return (n > 0 ? '+' : '') + n.toFixed(2) + ' h'; }
+
+    function timeInputFromTimestamp(timestamp) {
+      if (!timestamp) return '';
+      const d = new Date(timestamp);
+      if (Number.isNaN(d.getTime())) return '';
+      return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function editKeyForDay(email, giorno) {
+      return `${encodeURIComponent(email)}|${giorno}`;
+    }
+
+    function timestampTimbratura(record) {
+      const valore = record?.ora || record?.created_at;
+      const time = valore ? new Date(valore).getTime() : 0;
+      return Number.isNaN(time) ? 0 : time;
+    }
 
     function aggiornaDataOggi() {
       const now = new Date();
@@ -504,8 +528,18 @@
       const perGiorno = {};
       (data || []).forEach(r => {
         if (!perGiorno[r.data_lavoro]) perGiorno[r.data_lavoro] = { entrata: null, uscita: null };
-        if (r.tipo === 'entrata' && !perGiorno[r.data_lavoro].entrata) perGiorno[r.data_lavoro].entrata = r;
-        if (r.tipo === 'uscita' && !perGiorno[r.data_lavoro].uscita) perGiorno[r.data_lavoro].uscita = r;
+        if (r.tipo === 'entrata') {
+          const attuale = perGiorno[r.data_lavoro].entrata;
+          if (!attuale || timestampTimbratura(r) < timestampTimbratura(attuale)) {
+            perGiorno[r.data_lavoro].entrata = r;
+          }
+        }
+        if (r.tipo === 'uscita') {
+          const attuale = perGiorno[r.data_lavoro].uscita;
+          if (!attuale || timestampTimbratura(r) > timestampTimbratura(attuale)) {
+            perGiorno[r.data_lavoro].uscita = r;
+          }
+        }
       });
       return perGiorno;
     }
@@ -1051,7 +1085,7 @@
         inTrasferta = haversineKm(posizione.lat, posizione.lng, SEDE_LAT, SEDE_LNG) > SOGLIA_TRASFERTA_KM;
       }
 
-      const payload = { user_id: currentDipendente.id, nome: currentDipendente.nome, email: currentUser.email, tipo, data_lavoro: targetDataLavoro, lat: posizione.lat, lng: posizione.lng, in_trasferta: inTrasferta };
+      const payload = { user_id: currentDipendente.id, nome: currentDipendente.nome, email: currentUser.email, tipo, data_lavoro: targetDataLavoro, ora: now.toISOString(), lat: posizione.lat, lng: posizione.lng, in_trasferta: inTrasferta };
       if (tipo === 'entrata') payload.lavoro_serale_previsto = lavoroSeralePrevisto;
       const { error } = await client.from('timbrature').insert([payload]);
       if (error) return mostraMessaggio('Errore salvataggio: ' + error.message, true, 'appMsgBox');
@@ -1228,6 +1262,8 @@
     async function caricaDettaglio(email, nome = '', saldoIniziale = 0) {
       selectedDetailEmail = email;
       selectedDetailNome = nome || email;
+      adminDayEditCache = {};
+      timbraturaAdminCorrente = null;
       document.getElementById('saldoInizialeAdminInput').value = Number(saldoIniziale || 0).toFixed(2);
       document.getElementById('dettaglioDipendenteTitolo').textContent = `Dettaglio di ${selectedDetailNome}`;
       const dettaglioBox = document.getElementById('dettaglioBox');
@@ -1247,7 +1283,22 @@
           const giorno = isoDate(x);
           const record = perGiorno[giorno] || { entrata: null, uscita: null };
           const evalDay = evaluateDay(email, giorno, record, orePreviste);
-          html += `<tr><td>${giorno}</td><td>${record.entrata ? formatOra(record.entrata.ora || record.entrata.created_at) : '--:--'}</td><td>${evalDay.uscitaEffettiva ? formatOra(evalDay.uscitaEffettiva.ora || evalDay.uscitaEffettiva.created_at) : '--:--'}</td><td>${evalDay.ore.toFixed(2)}</td><td>${formatOreSigned(evalDay.delta)}</td><td>${evalDay.trasferta ? 'SI' : 'NO'}</td><td>${evalDay.note.length ? evalDay.note.join(', ') : '-'}</td><td><button class="btn-secondary" style="width:auto; min-width:120px; margin:0;" onclick="apriEditorTimbraturaAdmin('${email.replace(/'/g, "\'")}', '${selectedDetailNome.replace(/'/g, "\'")}', '${giorno}', '${record.entrata ? formatOra(record.entrata.ora || record.entrata.created_at) : ''}', '${evalDay.uscitaEffettiva ? formatOra(evalDay.uscitaEffettiva.ora || evalDay.uscitaEffettiva.created_at) : ''}', ${evalDay.trasferta ? 'true' : 'false'})">Modifica</button></td></tr>`;
+          const uscitaReale = evalDay.uscitaEffettiva?.auto_generata ? null : (record.uscita || null);
+          const editKey = editKeyForDay(email, giorno);
+
+          adminDayEditCache[editKey] = {
+            email,
+            nome: selectedDetailNome,
+            giorno,
+            entrata: record.entrata || null,
+            uscita: uscitaReale,
+            entrataOra: timeInputFromTimestamp(record.entrata?.ora || record.entrata?.created_at),
+            uscitaOra: timeInputFromTimestamp(evalDay.uscitaEffettiva?.ora || evalDay.uscitaEffettiva?.created_at),
+            trasferta: evalDay.trasferta,
+            saldoIniziale: Number(saldoIniziale || 0)
+          };
+
+          html += `<tr><td>${giorno}</td><td>${record.entrata ? formatOra(record.entrata.ora || record.entrata.created_at) : '--:--'}</td><td>${evalDay.uscitaEffettiva ? formatOra(evalDay.uscitaEffettiva.ora || evalDay.uscitaEffettiva.created_at) : '--:--'}</td><td>${evalDay.ore.toFixed(2)}</td><td>${formatOreSigned(evalDay.delta)}</td><td>${evalDay.trasferta ? 'SI' : 'NO'}</td><td>${evalDay.note.length ? evalDay.note.join(', ') : '-'}</td><td><button class="btn-secondary" style="width:auto; min-width:120px; margin:0;" onclick="apriEditorTimbraturaAdmin('${editKey}')">Modifica</button></td></tr>`;
         }
       }
       html += '</tbody></table></div>';
@@ -1264,21 +1315,110 @@
       return d.toISOString();
     }
 
-    function apriEditorTimbraturaAdmin(email, nome, giorno, entrata, uscita, trasferta) {
-      selectedDetailEmail = email;
-      selectedDetailNome = nome || email;
-      document.getElementById('editTimbraturaEmail').value = email;
-      document.getElementById('editTimbraturaNome').value = nome || email;
-      document.getElementById('editTimbraturaData').value = giorno;
-      document.getElementById('editOraEntrata').value = timeValueFromText(entrata);
-      document.getElementById('editOraUscita').value = timeValueFromText(uscita);
-      document.getElementById('editTrasferta').checked = !!trasferta;
+    function apriEditorTimbraturaAdmin(editKeyOrEmail, nome, giorno, entrata, uscita, trasferta) {
+      const cached = adminDayEditCache[editKeyOrEmail] || {
+        email: editKeyOrEmail,
+        nome: nome || editKeyOrEmail,
+        giorno,
+        entrata: null,
+        uscita: null,
+        entrataOra: timeValueFromText(entrata),
+        uscitaOra: timeValueFromText(uscita),
+        trasferta: !!trasferta,
+        saldoIniziale: Number(document.getElementById('saldoInizialeAdminInput').value || 0)
+      };
+
+      timbraturaAdminCorrente = cached;
+      selectedDetailEmail = cached.email;
+      selectedDetailNome = cached.nome || cached.email;
+      document.getElementById('editTimbraturaEmail').value = cached.email;
+      document.getElementById('editTimbraturaNome').value = selectedDetailNome;
+      document.getElementById('editTimbraturaData').value = cached.giorno;
+      document.getElementById('editOraEntrata').value = cached.entrataOra || '';
+      document.getElementById('editOraUscita').value = cached.uscitaOra || '';
+      document.getElementById('editTrasferta').checked = !!cached.trasferta;
       document.getElementById('adminEditTimbraturaBox').classList.remove('hidden');
       mostraMessaggio('Giornata caricata in modifica.', false, 'adminMsgBox');
     }
 
     function chiudiEditorTimbraturaAdmin() {
       document.getElementById('adminEditTimbraturaBox').classList.add('hidden');
+    }
+
+    function payloadTimbraturaAdmin(tipo, recordEsistente, dati) {
+      return {
+        user_id: dati.userId,
+        nome: dati.nomeFinale,
+        email: dati.email,
+        tipo,
+        data_lavoro: dati.giorno,
+        ora: localIsoFromDateTime(dati.giorno, dati.ora),
+        lat: recordEsistente?.lat ?? null,
+        lng: recordEsistente?.lng ?? null,
+        in_trasferta: tipo === 'uscita' ? dati.trasferta : false,
+        lavoro_serale_previsto: tipo === 'entrata' ? !!recordEsistente?.lavoro_serale_previsto : false
+      };
+    }
+
+    async function salvaRigaTimbraturaAdmin(tipo, recordEsistente, payload) {
+      if (recordEsistente?.id) {
+        const { error } = await client
+          .from('timbrature')
+          .update(payload)
+          .eq('id', recordEsistente.id);
+
+        if (error) throw new Error(`Errore aggiornamento ${tipo}: ${error.message}`);
+        return;
+      }
+
+      const { error } = await client
+        .from('timbrature')
+        .insert([payload]);
+
+      if (error) throw new Error(`Errore inserimento ${tipo}: ${error.message}`);
+    }
+
+    async function eliminaRigaTimbraturaAdmin(tipo, recordEsistente) {
+      if (!recordEsistente?.id) return;
+
+      const { error } = await client
+        .from('timbrature')
+        .delete()
+        .eq('id', recordEsistente.id);
+
+      if (error) throw new Error(`Errore eliminazione ${tipo}: ${error.message}`);
+    }
+
+    async function verificaGiornataAdmin(email, giorno, expected) {
+      const { data, error } = await client
+        .from('timbrature')
+        .select('tipo, ora, created_at, data_lavoro, email')
+        .eq('email', email)
+        .eq('data_lavoro', giorno)
+        .order('ora', { ascending: true });
+
+      if (error) throw new Error('Salvato, ma errore verifica: ' + error.message);
+
+      const grouped = raggruppaTimbraturePerGiorno(data || []);
+      const record = grouped[giorno] || { entrata: null, uscita: null };
+      const entrataOra = timeInputFromTimestamp(record.entrata?.ora || record.entrata?.created_at);
+      const uscitaOra = timeInputFromTimestamp(record.uscita?.ora || record.uscita?.created_at);
+
+      if (expected.entrata && entrataOra !== expected.entrata) {
+        throw new Error("La verifica non trova l'entrata salvata. Controlla le policy RLS di timbrature.");
+      }
+
+      if (!expected.entrata && entrataOra) {
+        throw new Error("La verifica trova ancora una entrata che doveva essere rimossa.");
+      }
+
+      if (expected.uscita && uscitaOra !== expected.uscita) {
+        throw new Error("La verifica non trova l'uscita salvata. Controlla le policy RLS di timbrature.");
+      }
+
+      if (!expected.uscita && uscitaOra) {
+        throw new Error("La verifica trova ancora una uscita che doveva essere rimossa.");
+      }
     }
 
     async function eliminaGiornataAdmin() {
@@ -1317,67 +1457,35 @@
         const utente = getUtenteByEmail(email);
         const userId = utente?.id || null;
         const nomeFinale = utente?.nome || nome || email;
-
-        const { error: deleteError } = await client
-          .from('timbrature')
-          .delete()
-          .eq('email', email)
-          .eq('data_lavoro', giorno);
-
-        if (deleteError) {
-          return mostraMessaggio('Errore eliminazione vecchie timbrature: ' + deleteError.message, true, 'adminMsgBox');
-        }
-
-        const nuoveTimbrature = [];
+        const corrente = timbraturaAdminCorrente || {};
 
         if (oraEntrata) {
-          nuoveTimbrature.push({
-            user_id: userId,
-            nome: nomeFinale,
+          await salvaRigaTimbraturaAdmin('entrata', corrente.entrata, payloadTimbraturaAdmin('entrata', corrente.entrata, {
+            userId,
+            nomeFinale,
             email,
-            tipo: 'entrata',
-            data_lavoro: giorno,
-            ora: localIsoFromDateTime(giorno, oraEntrata),
-            in_trasferta: false,
-            lavoro_serale_previsto: false
-          });
+            giorno,
+            ora: oraEntrata,
+            trasferta: false
+          }));
+        } else {
+          await eliminaRigaTimbraturaAdmin('entrata', corrente.entrata);
         }
 
         if (oraUscita) {
-          nuoveTimbrature.push({
-            user_id: userId,
-            nome: nomeFinale,
+          await salvaRigaTimbraturaAdmin('uscita', corrente.uscita, payloadTimbraturaAdmin('uscita', corrente.uscita, {
+            userId,
+            nomeFinale,
             email,
-            tipo: 'uscita',
-            data_lavoro: giorno,
-            ora: localIsoFromDateTime(giorno, oraUscita),
-            in_trasferta: trasferta,
-            lavoro_serale_previsto: false
-          });
+            giorno,
+            ora: oraUscita,
+            trasferta
+          }));
+        } else {
+          await eliminaRigaTimbraturaAdmin('uscita', corrente.uscita);
         }
 
-        const { error: insertError } = await client
-          .from('timbrature')
-          .insert(nuoveTimbrature);
-
-        if (insertError) {
-          return mostraMessaggio('Errore salvataggio nuove timbrature: ' + insertError.message, true, 'adminMsgBox');
-        }
-
-        const { data: verifica, error: verificaError } = await client
-          .from('timbrature')
-          .select('tipo, ora, data_lavoro, email')
-          .eq('email', email)
-          .eq('data_lavoro', giorno)
-          .order('ora', { ascending: true });
-
-        if (verificaError) {
-          return mostraMessaggio('Salvato, ma errore verifica: ' + verificaError.message, true, 'adminMsgBox');
-        }
-
-        if (!verifica || verifica.length === 0) {
-          return mostraMessaggio('Attenzione: salvataggio non confermato. Controlla le policy RLS di timbrature.', true, 'adminMsgBox');
-        }
+        await verificaGiornataAdmin(email, giorno, { entrata: oraEntrata, uscita: oraUscita });
 
         mostraMessaggio('Timbrature aggiornate correttamente.', false, 'adminMsgBox');
 
@@ -1393,7 +1501,7 @@
     }
 
     async function salvaSaldoInizialeAdmin() {
-      if (!selectedDetailEmail) return mostraMessaggio('Seleziona prima un currentDipendente.', true, 'adminMsgBox');
+      if (!selectedDetailEmail) return mostraMessaggio('Seleziona prima un dipendente.', true, 'adminMsgBox');
       const value = Number(document.getElementById('saldoInizialeAdminInput').value || 0);
       const { error } = await client.from('utenti').update({ saldo_iniziale_ore: value }).eq('email', selectedDetailEmail);
       if (error) return mostraMessaggio('Errore salvataggio saldo iniziale: ' + error.message, true, 'adminMsgBox');
