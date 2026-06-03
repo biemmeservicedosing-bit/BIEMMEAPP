@@ -360,6 +360,10 @@
       };
     }
 
+    function getUtenteByEmail(email) {
+      return cachedDipendenti.find(d => d.email === email) || null;
+    }
+
     function getUtenteIdByEmail(email) {
       const u = cachedDipendenti.find(d => d.email === email);
       return u?.id || null;
@@ -1299,12 +1303,14 @@
       const oraUscita = document.getElementById('editOraUscita').value;
       const trasferta = document.getElementById('editTrasferta').checked;
 
-      if (!email || !giorno) {
-        return mostraMessaggio('Seleziona prima una giornata da modificare.', true, 'adminMsgBox');
-      }
-      if (!oraEntrata && !oraUscita) {
-        return mostraMessaggio('Inserisci almeno entrata o uscita.', true, 'adminMsgBox');
-      }
+      if (!email || !giorno) return mostraMessaggio('Seleziona prima una giornata da modificare.', true, 'adminMsgBox');
+      if (!oraEntrata && !oraUscita) return mostraMessaggio('Inserisci almeno entrata o uscita.', true, 'adminMsgBox');
+
+      await loadAdminMeta();
+
+      const utente = getUtenteByEmail(email);
+      const userId = utente?.id || null;
+      const nomeFinale = utente?.nome || nome || email;
 
       const { error: deleteError } = await client
         .from('timbrature')
@@ -1312,16 +1318,14 @@
         .eq('email', email)
         .eq('data_lavoro', giorno);
 
-      if (deleteError) {
-        return mostraMessaggio('Errore eliminazione vecchie timbrature: ' + deleteError.message, true, 'adminMsgBox');
-      }
+      if (deleteError) return mostraMessaggio('Errore eliminazione vecchie timbrature: ' + deleteError.message, true, 'adminMsgBox');
 
       const nuoveTimbrature = [];
 
       if (oraEntrata) {
         nuoveTimbrature.push({
-          user_id: getUtenteIdByEmail(email),
-          nome,
+          user_id: userId,
+          nome: nomeFinale,
           email,
           tipo: 'entrata',
           data_lavoro: giorno,
@@ -1333,8 +1337,8 @@
 
       if (oraUscita) {
         nuoveTimbrature.push({
-          user_id: getUtenteIdByEmail(email),
-          nome,
+          user_id: userId,
+          nome: nomeFinale,
           email,
           tipo: 'uscita',
           data_lavoro: giorno,
@@ -1344,18 +1348,18 @@
         });
       }
 
-      const { error: insertError } = await client
-        .from('timbrature')
-        .insert(nuoveTimbrature);
-
-      if (insertError) {
-        return mostraMessaggio('Errore salvataggio nuove timbrature: ' + insertError.message, true, 'adminMsgBox');
-      }
+      const { error: insertError } = await client.from('timbrature').insert(nuoveTimbrature);
+      if (insertError) return mostraMessaggio('Errore salvataggio nuove timbrature: ' + insertError.message, true, 'adminMsgBox');
 
       mostraMessaggio('Timbrature aggiornate correttamente.', false, 'adminMsgBox');
+
       await loadAdminMeta();
       await caricaDashboardAdmin();
-      await caricaDettaglio(email, nome, Number(document.getElementById('saldoInizialeAdminInput').value || 0));
+      await caricaDettaglio(email, nomeFinale, Number(document.getElementById('saldoInizialeAdminInput').value || 0));
+
+      setTimeout(async () => {
+        await caricaDashboardAdmin();
+      }, 250);
     }
 
     async function salvaSaldoInizialeAdmin() {
