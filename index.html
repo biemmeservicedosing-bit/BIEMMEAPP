@@ -783,8 +783,8 @@
         <div style="text-align:left; padding:10px 0; border-bottom:1px solid #e5edf5;">
           <div><strong>${c.data_inizio}</strong> → <strong>${c.data_fine}</strong>${c.nota ? ` - ${c.nota}` : ''}</div>
           <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
-            <button class="btn-secondary" style="width:auto; min-width:120px; margin:0;" onclick="caricaChiusuraPerModifica(${c.id})">Modifica</button>
-            <button class="btn-secondary" style="width:auto; min-width:120px; margin:0;" onclick="eliminaChiusura(${c.id})">Elimina</button>
+            <button class="btn-secondary" style="width:auto; min-width:120px; margin:0;" onclick="caricaChiusuraPerModifica('${String(c.id).replace(/'/g, "\\'")}')">Modifica</button>
+            <button class="btn-secondary" style="width:auto; min-width:120px; margin:0;" onclick="eliminaChiusura('${String(c.id).replace(/'/g, "\\'")}')">Elimina</button>
           </div>
         </div>`).join('');
     }
@@ -797,8 +797,8 @@
         <div style="text-align:left; padding:10px 0; border-bottom:1px solid #e5edf5;">
           <div><strong>${a.email}</strong> - ${a.tipo} - <strong>${a.data_inizio}</strong> → <strong>${a.data_fine}</strong>${a.nota ? ` - ${a.nota}` : ''}</div>
           <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
-            <button class="btn-secondary" style="width:auto; min-width:120px; margin:0;" onclick="caricaAssenzaPerModifica(${a.id})">Modifica</button>
-            <button class="btn-secondary" style="width:auto; min-width:120px; margin:0;" onclick="eliminaAssenza(${a.id})">Elimina</button>
+            <button class="btn-secondary" style="width:auto; min-width:120px; margin:0;" onclick="caricaAssenzaPerModifica('${String(a.id).replace(/'/g, "\\'")}')">Modifica</button>
+            <button class="btn-secondary" style="width:auto; min-width:120px; margin:0;" onclick="eliminaAssenza('${String(a.id).replace(/'/g, "\\'")}')">Elimina</button>
           </div>
         </div>`).join('');
     }
@@ -1182,8 +1182,8 @@
     }
 
     function caricaChiusuraPerModifica(id) {
-      const row = cachedChiusure.find(c => c.id === id);
-      if (!row) return;
+      const row = cachedChiusure.find(c => String(c.id) === String(id));
+      if (!row) return mostraMessaggio('Chiusura non trovata in memoria. Ricarico i dati, riprova tra un attimo.', true, 'adminMsgBox');
       document.getElementById('chiusuraEditId').value = row.id;
       document.getElementById('chiusuraInizio').value = row.data_inizio;
       document.getElementById('chiusuraFine').value = row.data_fine;
@@ -1223,8 +1223,8 @@
     }
 
     function caricaAssenzaPerModifica(id) {
-      const row = cachedAssenze.find(a => a.id === id);
-      if (!row) return;
+      const row = cachedAssenze.find(a => String(a.id) === String(id));
+      if (!row) return mostraMessaggio('Assenza non trovata in memoria. Ricarico i dati, riprova tra un attimo.', true, 'adminMsgBox');
       document.getElementById('assenzaEditId').value = row.id;
       document.getElementById('assenzaDipendente').value = row.email;
       document.getElementById('assenzaInizio').value = row.data_inizio;
